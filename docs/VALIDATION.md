@@ -221,3 +221,61 @@ Backup: `~/.local/share/magicshelf/install-backups/native-polish-20261021T205412
 Version 0.2.2 remains available for rollback. This is installed locally; no GitHub
 release was published. The user tested creation/tab navigation and controller
 hover/trigger interaction in the headset and confirmed: **smooth, no flashing**.
+
+## Independent creation repositories — October 21, 2026
+
+MagicShelf 0.3.2 is installed on the Frame. The Phone and Digivice now have
+independent source repositories, pinned SDK dependencies, ARM build workflows,
+immutable release packages and subscription catalogs:
+
+- <https://github.com/josethevrtech/magicshelf-android-phone>
+- <https://github.com/josethevrtech/magicshelf-digivice>
+
+The framework source and previous native storefront improvements are published
+in <https://github.com/josethevrtech/magicshelf/pull/1>. The public MagicShelf
+installer remains 0.1.3; 0.3.2 is a tested local installation, not a published
+framework installer release. The creation releases document this requirement.
+
+- All 59 Python tests pass. Native grabbing/depth, dock recovery and storefront
+  control checks pass. Both independent ARM workflows build and package their
+  creations. A generated starter creation also builds and packages on the Frame.
+- Each API 2 package owns its shell and backend lifecycle, configuration and
+  docking commands. The old adapter services are disabled. Off stops the owned
+  processes; the Phone also stops its exact Android container. The user confirmed
+  both creations respond, configure, grab/move in depth, return to the dock, and
+  are silent when Off.
+- The user authorized fresh installations without preserving creation saves.
+  New package data/runtime directories were used. Existing game/model inputs were
+  imported locally; they were not published. The package builder explicitly
+  limits included assets; a packaging smoke check verified imported game/model
+  files are excluded even when present in the local source tree.
+- Both 0.2.2 packages downloaded through their public GitHub catalogs and remained
+  subscribed. Updating either creation left the other's process ID unchanged.
+  Each creation supplies its own gallery and metadata.
+- Normal removal deleted each installed package and generated service, canceled
+  its subscription, and left the other creation running. Re-subscribing downloaded
+  the package again; On and Configure succeeded. This second removal test used
+  the normal uninstall behavior, which retains data.
+- Digivice memory testing caught a combined game/Proton/shell allocation above
+  1 GiB. Its API 2 manifest now allows 2 GiB; stable observed use is about 1.5 GiB,
+  with no automatic restarts. Phone use is about 683 MiB under its 1 GiB limit.
+- Repeated startup exposed an intermittent Digivice first-capture stall despite
+  a running game and streaming PipeWire link. A second connection received frames.
+  Digivice 0.2.3 adds a bounded first-frame retry that keeps the old consumer alive
+  until the replacement receives a frame. Tests cover timing, source identity,
+  failed candidates and retaining a consumer throughout replacement.
+- Digivice 0.2.3 passed its independent ARM build/release workflow, downloaded
+  through the existing subscription, and delivered live frames on three
+  consecutive restarts. Phone's process remained unchanged throughout.
+- A temporary test shim withheld every frame on the first connection while
+  leaving its consumer connected. The installed public 0.2.3 binary opened a
+  replacement, logged recovery and received live game frames. The shim and
+  systemd override were removed, and a normal final start received frames.
+  Both creations were returned to the dock; Phone stayed running throughout.
+
+Local migration backup:
+`~/.local/share/magicshelf/install-backups/independent-creations-20261021T172121`.
+Per-creation runtime data, caches and externally supplied inputs are separate
+from immutable package directories. Android's opaque user-namespace files are
+outside ordinary framework data snapshots; see the API 2 rollback limitations
+in [CREATING.md](CREATING.md).

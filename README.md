@@ -114,8 +114,9 @@ The legacy browser interface is available only through the explicit
 `magicshelf web` diagnostic command. It is not the app launch path.
 
 Release artifacts are written to `dist/`. Build on the target architecture.
-The build also creates a catalog, a `.magicshelf` module archive, a verified
-bootstrap installer, and the downloadable `.desktop` launcher.
+The build creates the framework archive, catalog, verified bootstrap installer,
+and downloadable `.desktop` launcher. Creations build and publish their own
+`.magicshelf` packages; see [Creating a creation](docs/CREATING.md).
 
 ## Remove MagicShelf
 

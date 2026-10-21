@@ -7,9 +7,9 @@
    `tools/test_storefront.sh` and `tools/test_dashboard.sh`, and compile on each
    advertised architecture. Test the
    actual installer, VR library, on/off controls, a new module, and a failed update.
-3. `bash build.sh` writes verified framework and module archives, `catalog.json`,
+3. `bash build.sh` writes the verified framework archive, `catalog.json`,
    `install-magicshelf.py`, `Install.MagicShelf.desktop`, and `SHA256SUMS` into `dist/`.
-4. Commit the generated catalog to the repository. Create a release using the
+4. Create a framework release using the
    matching `vVERSION` tag and attach all the generated assets. A draft release
    keeps the download links unavailable until the complete set is ready.
 5. Publish the release only after the checksum-pinned desktop launcher refers to
@@ -19,11 +19,26 @@
    Confirm no private paths, saves, account data, third-party game/model assets,
    signing keys, or developer settings entered the release.
 
-To publish a new creation, copy the Pocket Clock manifest/package layout, choose a
-unique permanent ID, implement API v1 readiness and shelf/home behavior, and
-publish its archive as a GitHub release asset. Add its complete manifest, URL,
-SHA-256 and byte length to the collection catalog. Users receive the catalog
-change when they choose Check for updates; installation remains their choice.
+Creations have independent repositories, versions, release tags and catalogs.
+Start with `tools/new_creation.py` and follow [CREATING.md](CREATING.md). Pin an
+exact SDK commit; SDK upgrades are explicit source changes. The Phone and Digivice
+are working API 2 examples with their own backend lifecycle and configuration
+commands. A simpler creation can continue using API 1.
+
+Within a creation repository, update its manifest version, run its build/tests,
+and package with `tools/package_creation.py` (or the creation's wrapper). Publish
+the resulting `.magicshelf`, `catalog.json` and `SHA256SUMS` under a matching
+`vX.Y.Z` tag. A creation's stable collection URL is
+`https://github.com/OWNER/REPO/releases/latest/download/catalog.json`; each catalog
+points to immutable, versioned package URLs and includes their SHA-256 and size.
+Never overwrite published package assets. Followed collections show available
+creations, and free subscriptions download/install future releases automatically.
+New permissions require review; failed updates retain the working version.
+
+Test a new creation release through its public catalog on the Frame. Confirm
+that update, Off and removal affect only that creation, and that reinstall,
+configuration and return-to-dock work. Game/model inputs and user data remain
+local unless their distribution is explicitly supported by their licenses.
 
 CI runs framework tests without a headset. A source build for a new architecture
 must not be advertised as supported until its runtime and installer are tested.
