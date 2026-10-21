@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "api_version": 1,
+  "id": "org.magicshelf.pocket-clock",
+  "version": "0.1.0",
+  "name": "Pocket Clock",
+  "description": "A small desk clock for your MagicShelf shelf.",
+  "author": "josethevrtech",
+  "license": "MIT",
+  "platform": "linux",
+  "architecture": "aarch64",
+  "entrypoint": "bin/pocket-clock",
+  "permissions": ["vr-overlay"],
+  "memory_mb": 96
+}

@@ -1,0 +1,26 @@
+{
+  "schema": 3,
+  "name": "Power Toys",
+  "style": "shelf",
+  "launcher_only": true,
+  "opacity": 0.72,
+  "anchor_overlay": "valve.steam.gamepadui.main",
+  "slot_spacing_m": 0.12,
+  "object_height_m": 0.18,
+  "right_edge_m": -0.971016,
+  "center_y_m": -0.091,
+  "depth_m": 0.439428,
+  "objects": [
+    "local.androidphone.device",
+    "local.digitalpartner.device"
+  ],
+  "rail_height_m": 0.07,
+  "lean_degrees": -6.0,
+  "join_yaw_degrees": 56.0,
+  "join_pitch_degrees": 0,
+  "join_roll_degrees": 0,
+  "curve_radius_m": 0,
+  "curve_pitch_degrees": 0,
+  "foot_inset_m": 0,
+  "front_offset_m": 0
+}

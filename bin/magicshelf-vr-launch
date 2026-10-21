@@ -1,0 +1,3 @@
+#!/usr/bin/env python3
+import subprocess
+subprocess.run(["systemctl", "--user", "start", "magicshelf.service", "magicshelf-vr.service"], check=True)

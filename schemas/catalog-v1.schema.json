@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MagicShelf catalog v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "name",
+    "modules"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "modules": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "allOf": [
+          {
+            "$ref": "module-v1.schema.json"
+          },
+          {
+            "type": "object",
+            "required": [
+              "url",
+              "sha256",
+              "size_bytes"
+            ],
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "size_bytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 104857600
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "additionalProperties": true
+}

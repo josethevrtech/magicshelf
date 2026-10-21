@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""MagicShelf's release-pinned, user-only installer."""
+import hashlib,os,pathlib,platform,shutil,subprocess,tarfile,tempfile,urllib.request
+
+def main():
+    if platform.system()!='Linux' or platform.machine()!='@ARCH@':
+        raise RuntimeError('This release supports Linux @ARCH@. Download the matching MagicShelf release for your device.')
+    with tempfile.TemporaryDirectory(prefix='magicshelf-install-') as temp:
+        base=pathlib.Path(temp);archive=base/'magicshelf.tar.gz'
+        with urllib.request.urlopen('@URL@',timeout=60) as response,archive.open('xb') as output:
+            size=0
+            while chunk:=response.read(65536):
+                size+=len(chunk)
+                if size>100*1024*1024:raise RuntimeError('Download exceeds limit')
+                output.write(chunk)
+        if hashlib.sha256(archive.read_bytes()).hexdigest()!='@SHA256@':raise RuntimeError('MagicShelf verification failed; nothing was installed.')
+        with tarfile.open(archive) as tar:
+            members=tar.getmembers()
+            if len(members)>8192 or sum(m.size for m in members)>400*1024*1024:raise RuntimeError('Invalid release size')
+            for m in members:
+                p=pathlib.PurePosixPath(m.name)
+                if p.is_absolute() or '..' in p.parts or not p.parts or p.parts[0]!='magicshelf' or not (m.isfile() or m.isdir()):raise RuntimeError('Unsafe release path')
+            tar.extractall(base,filter='data')
+        subprocess.run(['python3',str(base/'magicshelf/install.py')],check=True)
+    print('MagicShelf is ready. Open the MagicShelf desktop icon.')
+    try:subprocess.run(['kdialog','--msgbox','MagicShelf is installed. Open MagicShelf on your desktop or in SteamVR’s dashboard.'],check=False)
+    except FileNotFoundError:pass
+if __name__=='__main__':
+    try:main()
+    except Exception as error:
+        print('MagicShelf:',error)
+        try:subprocess.run(['kdialog','--error',str(error)],check=False)
+        except FileNotFoundError:pass
+        raise SystemExit(1)
