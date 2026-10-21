@@ -1,9 +1,26 @@
 # MagicShelf
 
-A shelf where you get to play around with silly ideas I made.
+MagicShelf is a home for my VR creations. Subscribe to your favorites and make your shelf your own.
 
-A floating shelf and launcher for downloadable SteamVR toys. Install MagicShelf
-once, follow a collection, then choose which toys belong on your shelf.
+Built for **SteamOS and Steam Frame only**. Browse the native SteamVR collection, open a creation for
+screenshots and settings, and find its project links and artist credits.
+Subscriptions download published creations and keep them up to date.
+
+## See MagicShelf
+
+A look at the **0.3.6 development build** on Steam Frame. The public installer below is still **0.1.3**.
+
+[![Watch the MagicShelf feature tour](https://github.com/user-attachments/assets/dd44f9fe-1504-4130-92c3-9fde3a417a05)](https://github.com/user-attachments/assets/03aae0ae-83f4-459f-b648-a20a2ad3416f)
+
+**[Watch the 48-second feature tour with music](https://github.com/user-attachments/assets/03aae0ae-83f4-459f-b648-a20a2ad3416f)** — explore creations, card On/Off controls, artist credits, permission reviews, automatic downloads and shelf customization.
+
+| Discover | Creation details |
+| --- | --- |
+| ![Discover on Steam Frame](https://github.com/user-attachments/assets/b4ccd554-1e5b-45ff-ba4d-64f458f648a0) | ![Android Phone (Virtual)](https://github.com/user-attachments/assets/33bc835e-c0ba-4341-9958-5cf267bd5446) |
+| **Artist credits** | **Shelf settings** |
+| ![Smartphone Digivice artist credits](https://github.com/user-attachments/assets/e0a8cbb0-e3cc-43d0-b6bf-f9601ec10187) | ![Shelf customization controls](https://github.com/user-attachments/assets/94353032-21fa-4667-8835-db186a7d807f) |
+
+The tour uses the native app renderer with current creation metadata. Install and download scenes are illustrative. Music: **Shelf Lights**, composed and synthesized for this tour without external samples. Digivice model: [Jojogape](https://x.com/jojogape); Digital Partner game: [Aludeku](https://aludeku.itch.io/digital-partner-digimon).
 
 ## Install
 
@@ -22,14 +39,13 @@ The first binary release targets **Steam Frame / Linux aarch64**, with Python
 This is an early framework release; the installation and migration validation
 is recorded in [docs/VALIDATION.md](docs/VALIDATION.md).
 
-## Your collection
+## Published installer (0.1.3)
 
-- Turn a toy on to give it a shelf slot; turn it off to stop its module process.
-- Follow GitHub catalogs and review each toy before installing it.
-- Install and update toys independently. Failed readiness checks restore the
+- Turn a creation on to give it a shelf slot; turn it off to stop its module process.
+- Follow GitHub catalogs and review each creation before installing it.
+- Install and update creations independently. Failed readiness checks restore the
   previous code and module data; **Restore previous** also supports manual recovery.
-- Remove a toy while keeping its saved data.
-- **Return toys home** returns the active toys to the shelf.
+- Remove a creation while keeping its saved data.
 
 **Pocket Clock** is an optional developer example, excluded from the default shelf.
 MagicShelf is the single dashboard entry; use **Open** in its library for either device.
@@ -51,7 +67,7 @@ rejected before execution. Modules run in separate, memory-limited user services
 See [the module contract](docs/MODULES.md) and the [Pocket Clock source](examples/pocket-clock).
 
 Permissions are declarations for review, not a complete security sandbox. Native
-toys run as your user and can access user resources. Only install modules from
+creations run as your user and can access user resources. Only install modules from
 publishers you trust. Checksum verification detects changed downloads; it does
 not protect against a compromised publisher or catalog.
 
