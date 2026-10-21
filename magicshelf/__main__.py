@@ -2,11 +2,12 @@ import argparse
 import json
 import subprocess
 import sys
+from pathlib import Path
 from .client import request, runtime_dir
 
 def main():
     p = argparse.ArgumentParser(prog="magicshelf")
-    p.add_argument("command", choices=["serve", "open", "list", "adopt", "enable", "disable", "install", "remove", "rollback", "follow", "refresh", "home"])
+    p.add_argument("command", choices=["serve", "open", "web", "list", "adopt", "enable", "disable", "install", "remove", "rollback", "follow", "refresh", "home"])
     p.add_argument("value", nargs="?")
     p.add_argument("--permissions", nargs="*", default=[])
     args = p.parse_args()
@@ -14,6 +15,9 @@ def main():
         from .server import serve
         return serve()
     if args.command == "open":
+        launcher = Path(__file__).resolve().parent.parent / "bin/magicshelf-vr-launch"
+        return subprocess.run([str(launcher)], check=True).returncode
+    if args.command == "web":  # Explicit developer diagnostics, never the app launcher.
         subprocess.run(["systemctl", "--user", "start", "magicshelf.service"], check=True)
         import time
         for _ in range(40):

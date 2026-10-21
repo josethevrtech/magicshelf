@@ -56,7 +56,7 @@ def unpack(archive, destination, expected_hash, expected=None):
         import json
         meta = manifest(json.loads(z.read("module.json")))
         if expected:
-            for key in ("id", "version", "api_version", "entrypoint", "architecture", "permissions", "memory_mb"):
+            for key in ("id", "version", "api_version", "entrypoint", "architecture", "permissions", "memory_mb", "control_entrypoint", "cleanup_entrypoint", "startup_timeout_sec"):
                 require(meta.get(key) == expected.get(key), "Package does not match its catalog: " + key)
         for info in z.infolist():
             target = destination / info.filename
@@ -70,4 +70,8 @@ def unpack(archive, destination, expected_hash, expected=None):
                 target.chmod(0o755 if (info.external_attr >> 16) & 0o111 else 0o644)
         entry = destination / meta["entrypoint"]
         require(entry.is_file() and os.access(entry, os.X_OK), "Module entrypoint is not executable")
+    for field in ('control_entrypoint', 'cleanup_entrypoint'):
+        if field in meta:
+            helper = destination / meta[field]
+            require(helper.is_file() and os.access(helper, os.X_OK), 'Lifecycle entrypoint is not executable')
     return meta

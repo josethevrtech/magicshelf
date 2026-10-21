@@ -1,0 +1,284 @@
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -48,7 +48,9 @@
+  check(ov->SetOverlayFlag(device,VROverlayFlags_MakeOverlaysInteractiveIfVisible,true),"interactive device");
+  check(ov->SetOverlayFlag(device,VROverlayFlags_EnableClickStabilization,true),"device click stabilization");
+  check(ov->SetOverlayInputMethod(device,VROverlayInputMethod_Mouse),"device input");HmdVector2_t ms{{512,512}};check(ov->SetOverlayMouseScale(device,&ms),"device mouse scale");
+- std::unique_ptr<ControllerNav> navigation;if(AndroidOnly)navigation=std::make_unique<ControllerNav>(base);
++ auto navigation=std::make_unique<ControllerNav>(base);
++ bool grabDebug=fs::exists(base+"/grab-debug");auto lastGrabLog=std::chrono::steady_clock::now();
++ check(ov->SetOverlayFlag(device,VROverlayFlags_SendVRSmoothScrollEvents,true),"grab scroll");
+  if(AndroidOnly&&(!navigation||!navigation->available))check(ov->SetOverlayFlag(device,VROverlayFlags_SendVRDiscreteScrollEvents,true),"scroll fallback");
+  Renderer renderer(base);ObjectDock dock(ov,base);
+  unsigned char transparent[4]={0,0,0,0};if(dash)check(ov->SetOverlayRaw(dash,transparent,1,1,4),"transparent launcher");
+@@ -65,7 +67,7 @@
+  std::unique_ptr<Capture>androidCapture;std::unique_ptr<AndroidTouch>androidInput;uint32_t androidNode=0;uint64_t androidUploaded=0;double androidStarted=0;
+  auto lastUI=lastSource;auto lastSettingsTap=lastSource;
+  auto lastControlsPoll=lastSource,lastBrightnessCommand=lastSource,lastNavigation=std::chrono::steady_clock::now();double controlsRevision=0;
+- bool pointerOnScreen=false,queuedClick=false,brightnessDragging=false;VREvent_t lastPointer{};
++ bool pointerOnScreen=false,pointerOnHandle=false,queuedClick=false,brightnessDragging=false;VREvent_t lastPointer{};
+  uint32_t pointerController=k_unTrackedDeviceIndexInvalid;int pointerX=0,pointerY=0;
+  auto finishBrightness=[&](){if(!brightnessDragging)return;brightnessDragging=false;lastBrightnessCommand=std::chrono::steady_clock::now();save();androidCommand("{\"op\":\"brightness\",\"value\":"+std::to_string(brightness)+"}");};
+  auto toggleSettings=[&](bool open){finishBrightness();if(androidInput)androidInput->end();settingsOpen=open;dirty=true;if(!open){uploaded=0;androidUploaded=0;}};
+@@ -87,7 +89,7 @@
+   TrackedDevicePose_t poses[k_unMaxTrackedDeviceCount];VRSystem()->GetDeviceToAbsoluteTrackingPose(TrackingUniverseStanding,.011f,poses,k_unMaxTrackedDeviceCount);M head=fromvr(poses[0].mDeviceToAbsoluteTracking);dock.refresh();dock.show(poses[0].bPoseIsValid);if(!placed&&!docked&&poses[0].bPoseIsValid)recenter(head);
+   if(recallRequested&&poses[0].bPoseIsValid){auto left=VRSystem()->GetTrackedDeviceIndexForControllerRole(TrackedControllerRole_LeftHand);if(!wrist||left>=k_unMaxTrackedDeviceCount||!poses[left].bPoseIsValid){recenter(head);haveWristPose=false;}recallRequested=false;save();}
+   if(grab.active){
+-   if(wrist||grab.controller>=k_unMaxTrackedDeviceCount||!poses[grab.controller].bPoseIsValid){grab.end();save();}
++   if(wrist||!visible||!poses[0].bPoseIsValid||grab.controller>=k_unMaxTrackedDeviceCount||!poses[grab.controller].bPoseIsValid){grab.end();save();}
+    else{world=grab.follow(fromvr(poses[grab.controller].mDeviceToAbsoluteTracking));VRControllerState_t state{};
+     if(grab.watchTriggerRelease&&VRSystem()->GetControllerState(grab.controller,&state,sizeof(state))&&!(state.ulButtonPressed&ButtonMaskFromId(k_EButton_SteamVR_Trigger))){grab.end();save();std::cerr<<"Room placement released\n";}}
+   }
+@@ -98,13 +100,20 @@
+   }
+   while(queuedClick||ov->PollNextOverlayEvent(device,&e,sizeof(e))){
+    bool simulatedClick=queuedClick;if(queuedClick){e=lastPointer;e.eventType=VREvent_MouseButtonDown;e.data.mouse.button=VRMouseButton_Left;queuedClick=false;}
+-   if(e.eventType==VREvent_FocusLeave){finishBrightness();pointerOnScreen=false;if(androidInput)androidInput->end();}
++   if(e.eventType==VREvent_ScrollSmooth&&grab.active){
++    auto source=e.trackedDeviceIndex;
++    if(source==0||source==k_unTrackedDeviceIndexInvalid)source=ov->GetPrimaryDashboardDevice();
++    bool accepted=grab.queueScrollDepth(source,e.data.scroll.ydelta,e.eventAgeSeconds);
++    if(grabDebug&&!accepted&&now-lastGrabLog>std::chrono::seconds(1)){lastGrabLog=now;std::cerr<<"Grab scroll ignored: source="<<source<<" owner="<<grab.controller<<" age="<<e.eventAgeSeconds<<"\n";}
++    continue;
++   }
++   if(e.eventType==VREvent_FocusLeave){finishBrightness();pointerOnScreen=false;pointerOnHandle=false;if(androidInput)androidInput->end();}
+    if(AndroidOnly&&e.eventType==VREvent_ScrollDiscrete&&pointerOnScreen&&!settingsOpen&&visible&&!grab.active&&androidInput&&ov->IsHoverTargetOverlay(device)){
+     androidInput->stickScroll(e.data.scroll.xdelta,e.data.scroll.ydelta,.05f,pointerX,pointerY);continue;
+    }
+    if(e.eventType==VREvent_MouseButtonUp&&e.data.mouse.button==VRMouseButton_Left)finishBrightness();
+    if(e.eventType==VREvent_MouseButtonUp&&e.data.mouse.button==VRMouseButton_Left&&androidInput)androidInput->end();
+-   if(e.eventType==VREvent_MouseButtonUp&&e.data.mouse.button==VRMouseButton_Left&&grab.active){grab.end();save();std::cerr<<"Room placement saved\n";continue;}
++   if(e.eventType==VREvent_MouseButtonUp&&e.data.mouse.button==VRMouseButton_Left&&grab.active){if(e.trackedDeviceIndex==grab.controller||e.trackedDeviceIndex==k_unTrackedDeviceIndexInvalid||e.trackedDeviceIndex==0){grab.end();save();std::cerr<<"Room placement saved\n";}continue;}
+    if(grab.active)continue;
+    if(e.eventType==VREvent_KeyboardCharInput&&!settingsOpen){std::string value(e.data.keyboard.cNewInput,strnlen(e.data.keyboard.cNewInput,8));if(androidOpen&&androidInput)androidInput->text(value);else if(input)input->text(value);}
+    if(e.eventType!=VREvent_MouseMove&&e.eventType!=VREvent_MouseButtonDown)continue;
+@@ -115,16 +124,18 @@
+    M inv=inverse(lastModel);V a=mul(point(inv,origin),1/lastSize),b=mul(point(inv,target),1/lastSize);V delta=sub(b,a);if(fabsf(delta[2])<.0001f)continue;float t=(ScreenZ-a[2])/delta[2];if(t<0)continue;V hit=add(a,mul(delta,t));bool down=e.eventType==VREvent_MouseButtonDown;
+    if(down)std::cerr<<"Device input "<<e.data.mouse.x<<","<<e.data.mouse.y<<" hit="<<hit[0]<<","<<hit[1]<<" source="<<index<<"\n";
+    bool front=a[2]>ScreenZ;
+-   pointerOnScreen=front&&onGameScreen(hit);pointerController=index;
++   pointerOnScreen=front&&onGameScreen(hit);pointerOnHandle=renderer.showGrabHandle&&onGrabHandle(hit);pointerController=index;
+    if(pointerOnScreen){lastPointer=e;lastPointer.trackedDeviceIndex=index;auto targetPixel=screenPixel(hit);pointerX=targetPixel[0];pointerY=targetPixel[1];}
+    if(down&&front&&onHomeButton(hit)){
+     if(now-lastSettingsTap>=std::chrono::milliseconds(180)){lastSettingsTap=now;toggleSettings(!settingsOpen);std::cerr<<"Phone settings "<<(settingsOpen?"opened":"closed")<<"\n";}
+     continue;
+    }
+-   if(down&&!wrist&&onPhoneBody(hit)&&(!front||!onGameScreen(hit))&&index!=0&&poses[index].bPoseIsValid){
++   if(down&&!simulatedClick&&!wrist&&(pointerOnHandle||(onPhoneBody(hit)&&(!front||!onGameScreen(hit))))&&index!=0&&poses[index].bPoseIsValid){
+     VRControllerState_t state{};bool watch=VRSystem()->GetControllerState(index,&state,sizeof(state))&&(state.ulButtonPressed&ButtonMaskFromId(k_EButton_SteamVR_Trigger));
+-    if(docked){world=undockedRoomPose(lastModel,yaw);placed=true;docked=false;save();std::cerr<<"Object taken out of dock\n";}
+-    grab.begin(index,fromvr(poses[index].mDeviceToAbsoluteTracking),world,watch);
++    V grabPoint=point(lastModel,mul(hit,lastSize));
++    if(docked){world=undockedRoomPose(lastModel,yaw);V restoredPoint=point(mm(world,yawPose(yaw)),mul(hit,size));for(int axis=0;axis<3;axis++)world[12+axis]+=grabPoint[axis]-restoredPoint[axis];placed=true;docked=false;save();std::cerr<<"Creation taken out of dock\n";}
++    finishBrightness();if(androidInput)androidInput->end();if(input)input->end();pointerOnScreen=false;queuedClick=false;
++    grab.beginAt(index,fromvr(poses[index].mDeviceToAbsoluteTracking),world,grabPoint,watch);
+     ov->TriggerLaserMouseHapticVibration(device,.035f,80,.25f);std::cerr<<"Room grab began: controller "<<index<<"\n";continue;
+    }
+    if(front&&onGameScreen(hit)){
+@@ -169,14 +180,23 @@
+    }else{finishBrightness();if(androidInput&&androidOpen)androidInput->end();}
+   }
+   if(navigation){
+-   bool focused=visible&&(!docked||dock.available)&&poses[0].bPoseIsValid&&pointerOnScreen&&!grab.active&&pointerController<k_unMaxTrackedDeviceCount&&poses[pointerController].bPoseIsValid&&ov->IsHoverTargetOverlay(device);
+-   int role=pointerController<k_unMaxTrackedDeviceCount?(int)VRSystem()->GetControllerRoleForTrackedDeviceIndex(pointerController):0;
++   auto controller=grab.active?grab.controller:pointerController;
++   bool focused=visible&&(!docked||dock.available)&&poses[0].bPoseIsValid&&controller<k_unMaxTrackedDeviceCount&&poses[controller].bPoseIsValid&&(grab.active||(AndroidOnly&&pointerOnScreen&&ov->IsHoverTargetOverlay(device)));
++   int role=controller<k_unMaxTrackedDeviceCount?(int)VRSystem()->GetControllerRoleForTrackedDeviceIndex(controller):0;
+    float dt=std::chrono::duration<float>(now-lastNavigation).count();lastNavigation=now;
+-   auto action=navigation->update(focused,role,dt);
++   auto action=navigation->update(focused,role,dt,grab.active);
++   if(grab.active){
++    float depth=action.scrollY;bool axisAvailable=action.axisAvailable;
++    if(!action.axisAvailable){VRControllerState_t state{};if(VRSystem()->GetControllerState(controller,&state,sizeof(state)))for(int axis=0;axis<5;axis++)if(VRSystem()->GetInt32TrackedDeviceProperty(controller,(ETrackedDeviceProperty)(Prop_Axis0Type_Int32+axis))==k_eControllerAxis_Joystick){depth=ControllerNav::deflection(state.rAxis[axis].y);axisAvailable=true;break;}}
++    bool scrollInput=grab.pendingScrollDepth!=0;float before=grab.distance;
++    grab.updateDepth(depth,dt,axisAvailable);world=grab.follow(fromvr(poses[controller].mDeviceToAbsoluteTracking));
++    if(grabDebug&&now-lastGrabLog>std::chrono::seconds(1)){lastGrabLog=now;std::cerr<<"Grab depth controller="<<controller<<" input="<<(axisAvailable?"axis":scrollInput?"scroll":"none")<<" distance="<<grab.distance<<" change="<<grab.distance-before<<"\n";}
++   }else if(focused&&AndroidOnly){
+    if(action.home){if(androidInput)androidInput->end();androidCommand("{\"op\":\"home\"}");toggleSettings(false);std::cerr<<"Controller Home\n";}
+    else if(action.back){if(androidInput)androidInput->end();if(settingsOpen)toggleSettings(false);else androidCommand("{\"op\":\"back\"}");std::cerr<<"Controller Back\n";}
+    else if(action.click){if(androidInput)androidInput->stopScroll();queuedClick=true;std::cerr<<"Controller click\n";}
+    if(!settingsOpen&&androidInput&&!action.click&&!action.back&&!action.home){androidInput->stickScroll(action.scrollX,action.scrollY,dt,pointerX,pointerY);if(action.x||action.y)std::cerr<<"Controller scroll "<<action.x<<","<<action.y<<"\n";}
++   }
+   }
+   if(!visible||!poses[0].bPoseIsValid||(docked&&!dock.available)){finishBrightness();if(androidInput)androidInput->end();}
+   if(androidOpen&&!androidHasFrame&&!settingsOpen&&dirty){ui.fill(.035,.048,.065);ui.text(30,480,"Starting Android...",33);ui.text(30,530,AndroidOnly?"Bottom bezel button: settings":"Center button: settings",23);renderer.screen(ui);dirty=false;}
+@@ -185,8 +205,10 @@
+    drawPhoneSettings(ui,wrist,size,AndroidOnly?androidHasFrame:hasFrame,protectedCare,brightness,docked);renderer.screen(ui);dirty=false;lastUI=now;
+   }
+   renderer.brightness=brightness;
++  renderer.showGrabHandle=!wrist&&(ov->IsDashboardVisible()||grab.active||ov->IsHoverTargetOverlay(device));
++  renderer.highlightGrabHandle=grab.active||pointerOnHandle;
+   if(visible&&(docked?dock.available:placed)&&poses[0].bPoseIsValid){M model=docked?dock.model(size):world;float effective=docked?dock.size(size):size;bool show=true;if(wrist){auto idx=VRSystem()->GetTrackedDeviceIndexForControllerRole(TrackedControllerRole_LeftHand);if(idx<k_unMaxTrackedDeviceCount&&poses[idx].bPoseIsValid){model=mm(fromvr(poses[idx].mDeviceToAbsoluteTracking),pose({1,0,0},{0,0,-1},{0,1,0},{0,.055f,-.10f}));wristFallback=model;haveWristPose=true;effective*=.55f;}else if(haveWristPose){model=wristFallback;effective*=.55f;}}
+-   if(!docked)model=mm(model,yawPose(yaw));V p=point(model,{0,0,ScreenZ*effective}),h=point(head,{0,0,0}),z=norm(sub(h,p)),x=norm(cross({0,1,0},z)),y=cross(z,x);M plane=pose(x,y,z,p);float width=PhonePlaneWidth*effective;
++   if(!docked)model=mm(model,yawPose(yaw));V p=point(model,{0,0,ScreenZ*effective}),h=point(head,{0,0,0}),z=norm(sub(h,p)),x=norm(cross({0,1,0},z)),y=cross(z,x);M plane=pose(x,y,z,p);float width=InteractionPlaneWidth*effective;
+    if(show&&dot(sub(h,p),sub(h,p))>.03f){
+     V eye[2];for(int i=0;i<2;i++)eye[i]=point(mm(head,fromvr(VRSystem()->GetEyeToHeadTransform((EVREye)i))),{0,0,0});renderer.mode=(androidOpen?androidHasFrame:hasFrame)?mode:-1;renderer.draw(plane,model,eye[0],eye[1],width,effective,false);glFinish();Texture_t texture{(void*)(uintptr_t)renderer.tex,TextureType_OpenGL,ColorSpace_Gamma};check(ov->SetOverlayTexture(device,&texture),"Phone texture");check(ov->SetOverlayWidthInMeters(device,width),"Phone width");auto tr=tovr(plane);check(ov->SetOverlayTransformAbsolute(device,TrackingUniverseStanding,&tr),"Phone placement");check(ov->ShowOverlay(device),"Phone show");lastPlane=plane;lastModel=model;lastSize=effective;lastWidth=width;}else ov->HideOverlay(device);
+   }else ov->HideOverlay(device);
+--- a/src/placement.h
++++ b/src/placement.h
+@@ -2,18 +2,52 @@
+ #include "render.h"
+ #include <cstdint>
+
+-// A distance grab preserves the controller-to-phone transform. It remains
+-// attached to that controller until release, even outside the overlay's bounds.
++// Keep the selected point attached to the controller's laser. Thumbstick depth
++// translates along that ray without changing the creation's size or rotation.
+ struct RoomGrab {
+  bool active=false,watchTriggerRelease=false;
+  uint32_t controller=0;
+  M offset=identity();
++ V ray{0,0,-1};
++ float distance=0,pendingScrollDepth=0;
++ static constexpr float MinDistance=.20f,MaxDistance=5.f,DepthSpeed=1.5f;
++ static constexpr float ScrollMetresPerUnit=.075f;
+  void begin(uint32_t index,M hand,M room,bool watchRelease=false){
++  beginAt(index,hand,room,point(room,{0,0,0}),watchRelease);
++ }
++ void beginAt(uint32_t index,M hand,M room,V target,bool watchRelease=false){
+   controller=index;offset=mm(inverse(hand),room);
+-  active=true;watchTriggerRelease=watchRelease;
++  V local=point(inverse(hand),target);distance=std::sqrt(dot(local,local));
++  ray=distance>.0001f?mul(local,1.f/distance):V{0,0,-1};
++  pendingScrollDepth=0;active=true;watchTriggerRelease=watchRelease;
++ }
++ void moveDepth(float stick,float dt){
++  if(!active||!std::isfinite(stick)||!std::isfinite(dt)||dt<=0)return;
++  moveDepthBy(std::clamp(stick,-1.f,1.f)*DepthSpeed*std::min(dt,.05f));
++ }
++ // SteamVR's dashboard owns the stick on Frame and delivers integrated scroll
++ // deltas instead of an active analog action. Forward produces positive scroll.
++ // Do not dead-zone these deltas or multiply them by frame time a second time.
++ bool queueScrollDepth(uint32_t source,float delta,float age){
++  if(!active||source!=controller||!std::isfinite(delta)||!std::isfinite(age)||age<0||age>.1f)return false;
++  pendingScrollDepth=std::clamp(pendingScrollDepth+delta*ScrollMetresPerUnit,-DepthSpeed*.05f,DepthSpeed*.05f);
++  return true;
++ }
++ void updateDepth(float stick,float dt,bool axisAvailable){
++  if(axisAvailable)moveDepth(stick,dt);
++  else moveDepthBy(pendingScrollDepth);
++  pendingScrollDepth=0;
++ }
++ void moveDepthBy(float step){
++  if(!active||!std::isfinite(step))return;
++  // An existing placement outside the range may move back gradually, without
++  // jumping to a limit when the user first touches the stick.
++  float next=std::clamp(distance+step,std::min(MinDistance,distance),std::max(MaxDistance,distance));
++  for(int i=0;i<3;i++)offset[12+i]+=ray[i]*(next-distance);
++  distance=next;
+  }
+  M follow(M hand)const{return mm(hand,offset);}
+- void end(){active=false;watchTriggerRelease=false;}
++ void end(){active=false;watchTriggerRelease=false;pendingScrollDepth=0;}
+ };
+
+ bool validRoomPose(const M&m){
+@@ -27,6 +61,7 @@
+
+ bool onGameScreen(V hit){return fabsf(hit[0])<=ScreenX&&fabsf(hit[1]-ScreenCY)<=ScreenY;}
+ bool onPhoneBody(V hit){return fabsf(hit[0])<=BodyX+.002f&&fabsf(hit[1])<=BodyY+.002f;}
++bool onGrabHandle(V hit){return fabsf(hit[0])<=GrabHalfWidth+.005f&&fabsf(hit[1]-GrabY)<=GrabHalfHeight+.004f;}
+ bool onHomeButton(V hit){return fabsf(hit[0])<HomeHalfX&&fabsf(hit[1]-HomeY)<HomeHalfY;}
+ std::array<int,2> screenPixel(V hit,int width=ScreenWidth,int height=ScreenHeight){
+  float u=(hit[0]/ScreenX+1)*.5f,v=(1-(hit[1]-ScreenCY)/ScreenY)*.5f;
+--- a/src/profile.h
++++ b/src/profile.h
+@@ -35,3 +35,6 @@
+ constexpr int RenderWidth=2048,RenderHeight=1024;
+ #endif
+ constexpr int SettingsWidth=480,SettingsHeight=1046;
++constexpr float GrabHalfWidth=.025f,GrabHalfHeight=.003f,GrabY=-BodyY-.013f;
++// The transparent stereo canvas includes the handle and its larger hit target.
++constexpr float InteractionPlaneWidth=2.f*(BodyY+.025f)>PhonePlaneWidth?2.f*(BodyY+.025f):PhonePlaneWidth;
+--- a/src/render.h
++++ b/src/render.h
+@@ -34,6 +34,7 @@
+  EGLDisplay display;EGLContext context;EGLSurface surface;GLuint program,vbo,fbo,tex,depth,lcd;
+  int count=0,mode=-1,W=RenderWidth,H=RenderHeight,lcdWidth=0,lcdHeight=0;std::vector<unsigned char>raw;std::vector<Material> materials;
+  float brightness=1.f;
++ bool showGrabHandle=false,highlightGrabHandle=false;
+  Renderer(std::string base):raw(W*H*4){
+  auto get=(PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");display=get?get(EGL_PLATFORM_SURFACELESS_MESA,EGL_DEFAULT_DISPLAY,nullptr):eglGetDisplay(EGL_DEFAULT_DISPLAY);
+  if(!eglInitialize(display,nullptr,nullptr))throw std::runtime_error("EGL init failed");eglBindAPI(EGL_OPENGL_ES_API);
+@@ -45,11 +46,17 @@
+  void main(){gl_Position=mvp*vec4(position,1);N=normal;P=position;UV=uv;})";
+  const char*fs=R"(#version 300 es
+  precision highp float;in vec3 N;in vec3 P;in vec2 UV;
+- uniform sampler2D lcd;uniform sampler2D housing;uniform bool screen;
++ uniform sampler2D lcd;uniform sampler2D housing;uniform bool screen;uniform bool handle;uniform bool handleHighlight;
+  uniform vec3 eye;uniform float roughness;uniform float metallic;uniform float brightness;out vec4 frag;
+  vec3 srgb(vec3 c){return mix(12.92*c,1.055*pow(max(c,vec3(0)),vec3(1.0/2.4))-.055,step(vec3(.0031308),c));}
+  vec3 linearRGB(vec3 c){return mix(c/12.92,pow((c+.055)/1.055,vec3(2.4)),step(vec3(.04045),c));}
+  void main(){
++  if(handle){
++   vec2 p=vec2((UV.x-.5)*8.333333,(UV.y-.5)*2.0);
++   float d=length(vec2(max(abs(p.x)-3.166667,0.0),p.y));
++   float a=1.0-smoothstep(.88,1.0,d);if(a<=0.0)discard;
++   frag=vec4(handleHighlight?vec3(.55,.83,1.0):vec3(.8,.84,.89),a*.95);return;
++  }
+   if(screen){frag=texture(lcd,UV);frag.rgb=srgb(linearRGB(frag.rgb)*brightness);return;}
+   vec4 surface=texture(housing,UV);vec3 color=surface.rgb;
+   vec3 normal=normalize(N),view=normalize(eye-P),light=normalize(view+vec3(-.4,.6,.35));
+@@ -80,6 +87,8 @@
+  std::vector<Vertex> v(num);f.read((char*)v.data(),num*sizeof(Vertex));if(!f)throw std::runtime_error("Truncated mesh");count=num;
+  float x=ScreenX,y=ScreenY,cy=ScreenCY,z=ScreenZ;
+  Vertex q[]={ {-x,cy-y,z,0,0,1,0,1},{x,cy-y,z,0,0,1,1,1},{x,cy+y,z,0,0,1,1,0},{-x,cy-y,z,0,0,1,0,1},{x,cy+y,z,0,0,1,1,0},{-x,cy+y,z,0,0,1,0,0}};v.insert(v.end(),q,q+6);
++ x=GrabHalfWidth;y=GrabHalfHeight;cy=GrabY;
++ Vertex bar[]={ {-x,cy-y,z,0,0,1,0,1},{x,cy-y,z,0,0,1,1,1},{x,cy+y,z,0,0,1,1,0},{-x,cy-y,z,0,0,1,0,1},{x,cy+y,z,0,0,1,1,0},{-x,cy+y,z,0,0,1,0,0}};v.insert(v.end(),bar,bar+6);
+  glGenBuffers(1,&vbo);glBindBuffer(GL_ARRAY_BUFFER,vbo);glBufferData(GL_ARRAY_BUFFER,v.size()*sizeof(Vertex),v.data(),GL_STATIC_DRAW);
+  glGenTextures(1,&tex);glBindTexture(GL_TEXTURE_2D,tex);glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,W,H,0,GL_RGBA,GL_UNSIGNED_BYTE,nullptr);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+  glGenFramebuffers(1,&fbo);glBindFramebuffer(GL_FRAMEBUFFER,fbo);glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,tex,0);glGenRenderbuffers(1,&depth);glBindRenderbuffer(GL_RENDERBUFFER,depth);glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH_COMPONENT24,W,H);glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,depth);if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)throw std::runtime_error("FBO failed");
+@@ -105,10 +114,11 @@
+   glUniform3f(glGetUniformLocation(program,"eye"),objectEye[0],objectEye[1],objectEye[2]);
+   float ez=std::max(.08f,e[2]);M view=identity();view[12]=-e[0];view[13]=-e[1];view[14]=-ez;float n=.02f;
+   M pr=projection((-width/2-e[0])*n/ez,(width/2-e[0])*n/ez,(-width/2-e[1])*n/ez,(width/2-e[1])*n/ez,n);M mvp=mm(pr,mm(view,local));
+-  glViewport(index*W/2,0,W/2,H);glUniformMatrix4fv(glGetUniformLocation(program,"mvp"),1,GL_FALSE,mvp.data());glUniform1i(glGetUniformLocation(program,"screen"),0);
++  glViewport(index*W/2,0,W/2,H);glUniformMatrix4fv(glGetUniformLocation(program,"mvp"),1,GL_FALSE,mvp.data());glUniform1i(glGetUniformLocation(program,"screen"),0);glUniform1i(glGetUniformLocation(program,"handle"),0);
+   glActiveTexture(GL_TEXTURE1);
+   for(auto&m:materials){glBindTexture(GL_TEXTURE_2D,m.texture);glUniform1f(glGetUniformLocation(program,"roughness"),m.roughness);glUniform1f(glGetUniformLocation(program,"metallic"),m.metallic);glDrawArrays(GL_TRIANGLES,m.first,m.count);}
+   glUniform1i(glGetUniformLocation(program,"screen"),1);glDrawArrays(GL_TRIANGLES,count,6);
++  if(showGrabHandle){glUniform1i(glGetUniformLocation(program,"handle"),1);glUniform1i(glGetUniformLocation(program,"handleHighlight"),highlightGrabHandle);glDrawArrays(GL_TRIANGLES,count+6,6);}
+  }
+  glActiveTexture(GL_TEXTURE0);
+  if(readback){glReadPixels(0,0,W,H,GL_RGBA,GL_UNSIGNED_BYTE,raw.data());for(int y=0;y<H/2;y++)for(int x=0;x<W*4;x++)std::swap(raw[y*W*4+x],raw[(H-1-y)*W*4+x]);}return raw.data();
+--- a/src/controller_nav.h
++++ b/src/controller_nav.h
+@@ -6,7 +6,7 @@
+ #include <algorithm>
+ struct ControllerNav {
+  vr::VRActionSetHandle_t set=0;vr::VRActionHandle_t scroll=0,click=0,back=0,home=0;vr::VRInputValueHandle_t hand[2]{};
+- bool available=false,wasFocused=false;
++ bool available=false,wasFocused=false,wasGrabbing=false,waitForNeutral=false;
+  float wheelX=0,wheelY=0;
+  explicit ControllerNav(const std::string&base){
+   auto*i=vr::VRInput();auto error=i->SetActionManifestPath((base+"/assets/input/actions.json").c_str());
+@@ -16,19 +16,25 @@
+   i->GetInputSourceHandle("/user/hand/left",&hand[0]);i->GetInputSourceHandle("/user/hand/right",&hand[1]);
+   available=error==vr::VRInputError_None;std::cerr<<"Phone controller actions ready="<<available<<"\n";
+  }
+- struct Result{float scrollX=0,scrollY=0;int x=0,y=0;bool click=false,back=false,home=false;};
++ struct Result{float scrollX=0,scrollY=0;int x=0,y=0;bool click=false,back=false,home=false,axisAvailable=false;};
+  static float deflection(float value){return std::abs(value)<=.25f?0:std::copysign((std::min(std::abs(value),1.f)-.25f)/.75f,value);}
+- Result update(bool focused,int role,float dt){
++ Result update(bool focused,int role,float dt,bool grabbing=false){
+   Result out;if(!available)return out;auto*i=vr::VRInput();vr::VRActiveActionSet_t active{};active.ulActionSet=set;
+-  active.ulRestrictedToDevice=role>=1&&role<=2?hand[role-1]:vr::k_ulInvalidInputValueHandle;
++  if(wasGrabbing&&!grabbing)waitForNeutral=true;
++  wasGrabbing=grabbing;
++  focused=focused&&role>=1&&role<=2;
++  active.ulRestrictedToDevice=focused?hand[role-1]:vr::k_ulInvalidInputValueHandle;
+   active.nPriority=vr::k_nActionSetOverlayGlobalPriorityMin+1;
+   auto error=i->UpdateActionState(focused?&active:nullptr,sizeof(active),focused?1:0);
+   if(error||!focused){wasFocused=false;wheelX=wheelY=0;return out;}
+   auto pressed=[&](vr::VRActionHandle_t action){vr::InputDigitalActionData_t data{};return i->GetDigitalActionData(action,&data,sizeof(data),active.ulRestrictedToDevice)==vr::VRInputError_None&&wasFocused&&data.bActive&&data.bChanged&&data.bState;};
+-  out.click=pressed(click);out.back=pressed(back);out.home=pressed(home);
++  if(!grabbing){out.click=pressed(click);out.back=pressed(back);out.home=pressed(home);}
+   vr::InputAnalogActionData_t axis{};
+   if(i->GetAnalogActionData(scroll,&axis,sizeof(axis),active.ulRestrictedToDevice)==vr::VRInputError_None&&axis.bActive){
++   out.axisAvailable=true;
++   if(!grabbing&&waitForNeutral){if(std::abs(axis.x)<=.25f&&std::abs(axis.y)<=.25f)waitForNeutral=false;wasFocused=true;return out;}
+    out.scrollX=deflection(axis.x);out.scrollY=deflection(axis.y);
++   if(grabbing){wheelX=wheelY=0;wasFocused=true;return out;}
+    wheelX+=out.scrollX*10*std::clamp(dt,0.f,.1f);wheelY+=out.scrollY*10*std::clamp(dt,0.f,.1f);
+    out.x=(int)wheelX;out.y=(int)wheelY;wheelX-=out.x;wheelY-=out.y;
+   }

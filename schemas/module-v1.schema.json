@@ -22,7 +22,10 @@
       "const": 1
     },
     "api_version": {
-      "const": 1
+      "enum": [
+        1,
+        2
+      ]
     },
     "id": {
       "type": "string",
@@ -71,7 +74,8 @@
         "enum": [
           "vr-overlay",
           "network",
-          "user-files"
+          "user-files",
+          "external-runtime"
         ]
       },
       "contains": {
@@ -81,8 +85,23 @@
     "memory_mb": {
       "type": "integer",
       "minimum": 32,
-      "maximum": 1024,
+      "maximum": 4096,
       "default": 256
+    },
+    "control_entrypoint": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Relative executable path; no empty, dot, parent, absolute or backslash components"
+    },
+    "cleanup_entrypoint": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Relative executable path; no empty, dot, parent, absolute or backslash components"
+    },
+    "startup_timeout_sec": {
+      "type": "integer",
+      "minimum": 20,
+      "maximum": 180
     }
   },
   "additionalProperties": true

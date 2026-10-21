@@ -34,6 +34,7 @@ struct Renderer{
  EGLDisplay display;EGLContext context;EGLSurface surface;GLuint program,vbo,fbo,tex,depth,lcd;
  int count=0,mode=-1,W=RenderWidth,H=RenderHeight,lcdWidth=0,lcdHeight=0;std::vector<unsigned char>raw;std::vector<Material> materials;
  float brightness=1.f;
+ bool showGrabHandle=false,highlightGrabHandle=false,dockGrabHandle=false;
  Renderer(std::string base):raw(W*H*4){
  auto get=(PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");display=get?get(EGL_PLATFORM_SURFACELESS_MESA,EGL_DEFAULT_DISPLAY,nullptr):eglGetDisplay(EGL_DEFAULT_DISPLAY);
  if(!eglInitialize(display,nullptr,nullptr))throw std::runtime_error("EGL init failed");eglBindAPI(EGL_OPENGL_ES_API);
@@ -45,11 +46,17 @@ struct Renderer{
  void main(){gl_Position=mvp*vec4(position,1);N=normal;P=position;UV=uv;})";
  const char*fs=R"(#version 300 es
  precision highp float;in vec3 N;in vec3 P;in vec2 UV;
- uniform sampler2D lcd;uniform sampler2D housing;uniform bool screen;
+ uniform sampler2D lcd;uniform sampler2D housing;uniform bool screen;uniform bool handle;uniform bool handleHighlight;uniform bool handleDock;
  uniform vec3 eye;uniform float roughness;uniform float metallic;uniform float brightness;out vec4 frag;
  vec3 srgb(vec3 c){return mix(12.92*c,1.055*pow(max(c,vec3(0)),vec3(1.0/2.4))-.055,step(vec3(.0031308),c));}
  vec3 linearRGB(vec3 c){return mix(c/12.92,pow((c+.055)/1.055,vec3(2.4)),step(vec3(.04045),c));}
  void main(){
+  if(handle){
+   vec2 p=vec2((UV.x-.5)*8.333333,(UV.y-.5)*2.0);
+   float d=length(vec2(max(abs(p.x)-3.166667,0.0),p.y));
+   float a=1.0-smoothstep(.88,1.0,d);if(a<=0.0)discard;
+   frag=vec4(handleDock?vec3(.40,1.0,.65):(handleHighlight?vec3(.55,.83,1.0):vec3(.8,.84,.89)),a*.95);return;
+  }
   if(screen){frag=texture(lcd,UV);frag.rgb=srgb(linearRGB(frag.rgb)*brightness);return;}
   vec4 surface=texture(housing,UV);vec3 color=surface.rgb;
   vec3 normal=normalize(N),view=normalize(eye-P),light=normalize(view+vec3(-.4,.6,.35));
@@ -80,6 +87,8 @@ struct Renderer{
  std::vector<Vertex> v(num);f.read((char*)v.data(),num*sizeof(Vertex));if(!f)throw std::runtime_error("Truncated mesh");count=num;
  float x=ScreenX,y=ScreenY,cy=ScreenCY,z=ScreenZ;
  Vertex q[]={ {-x,cy-y,z,0,0,1,0,1},{x,cy-y,z,0,0,1,1,1},{x,cy+y,z,0,0,1,1,0},{-x,cy-y,z,0,0,1,0,1},{x,cy+y,z,0,0,1,1,0},{-x,cy+y,z,0,0,1,0,0}};v.insert(v.end(),q,q+6);
+ x=GrabHalfWidth;y=GrabHalfHeight;cy=GrabY;
+ Vertex bar[]={ {-x,cy-y,z,0,0,1,0,1},{x,cy-y,z,0,0,1,1,1},{x,cy+y,z,0,0,1,1,0},{-x,cy-y,z,0,0,1,0,1},{x,cy+y,z,0,0,1,1,0},{-x,cy+y,z,0,0,1,0,0}};v.insert(v.end(),bar,bar+6);
  glGenBuffers(1,&vbo);glBindBuffer(GL_ARRAY_BUFFER,vbo);glBufferData(GL_ARRAY_BUFFER,v.size()*sizeof(Vertex),v.data(),GL_STATIC_DRAW);
  glGenTextures(1,&tex);glBindTexture(GL_TEXTURE_2D,tex);glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,W,H,0,GL_RGBA,GL_UNSIGNED_BYTE,nullptr);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
  glGenFramebuffers(1,&fbo);glBindFramebuffer(GL_FRAMEBUFFER,fbo);glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,tex,0);glGenRenderbuffers(1,&depth);glBindRenderbuffer(GL_RENDERBUFFER,depth);glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH_COMPONENT24,W,H);glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,depth);if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)throw std::runtime_error("FBO failed");
@@ -105,10 +114,11 @@ struct Renderer{
   glUniform3f(glGetUniformLocation(program,"eye"),objectEye[0],objectEye[1],objectEye[2]);
   float ez=std::max(.08f,e[2]);M view=identity();view[12]=-e[0];view[13]=-e[1];view[14]=-ez;float n=.02f;
   M pr=projection((-width/2-e[0])*n/ez,(width/2-e[0])*n/ez,(-width/2-e[1])*n/ez,(width/2-e[1])*n/ez,n);M mvp=mm(pr,mm(view,local));
-  glViewport(index*W/2,0,W/2,H);glUniformMatrix4fv(glGetUniformLocation(program,"mvp"),1,GL_FALSE,mvp.data());glUniform1i(glGetUniformLocation(program,"screen"),0);
+  glViewport(index*W/2,0,W/2,H);glUniformMatrix4fv(glGetUniformLocation(program,"mvp"),1,GL_FALSE,mvp.data());glUniform1i(glGetUniformLocation(program,"screen"),0);glUniform1i(glGetUniformLocation(program,"handle"),0);
   glActiveTexture(GL_TEXTURE1);
   for(auto&m:materials){glBindTexture(GL_TEXTURE_2D,m.texture);glUniform1f(glGetUniformLocation(program,"roughness"),m.roughness);glUniform1f(glGetUniformLocation(program,"metallic"),m.metallic);glDrawArrays(GL_TRIANGLES,m.first,m.count);}
   glUniform1i(glGetUniformLocation(program,"screen"),1);glDrawArrays(GL_TRIANGLES,count,6);
+  if(showGrabHandle){glUniform1i(glGetUniformLocation(program,"handle"),1);glUniform1i(glGetUniformLocation(program,"handleHighlight"),highlightGrabHandle);glUniform1i(glGetUniformLocation(program,"handleDock"),dockGrabHandle);glDrawArrays(GL_TRIANGLES,count+6,6);}
  }
  glActiveTexture(GL_TEXTURE0);
  if(readback){glReadPixels(0,0,W,H,GL_RGBA,GL_UNSIGNED_BYTE,raw.data());for(int y=0;y<H/2;y++)for(int x=0;x<W*4;x++)std::swap(raw[y*W*4+x],raw[(H-1-y)*W*4+x]);}return raw.data();

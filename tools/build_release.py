@@ -1,31 +1,22 @@
 #!/usr/bin/env python3
-"""Build immutable framework/module assets and a pinned single-file launcher."""
+"""Build immutable framework assets and a pinned single-file launcher."""
 import argparse, base64, hashlib, json, os, shutil, stat, tarfile, tempfile, zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent.parent
-VERSION='0.1.3'
+VERSION='0.3.2'
 REPO='josethevrtech/magicshelf'
 
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def build(arch):
     out=ROOT/'dist';out.mkdir(exist_ok=True)
-    meta=json.loads((ROOT/'examples/pocket-clock/module.json').read_text());meta['architecture']=arch
-    module=out/f'pocket-clock-{meta["version"]}-linux-{arch}.magicshelf'
-    with zipfile.ZipFile(module,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
-        for name,data,mode in [('module.json',(json.dumps(meta,indent=2,sort_keys=True)+'\n').encode(),0o100644),('bin/pocket-clock',(ROOT/'build/modules/pocket-clock/bin/pocket-clock').read_bytes(),0o100755),('LICENSE',(ROOT/'LICENSE').read_bytes(),0o100644)]:
-            info=zipfile.ZipInfo(name,date_time=(2026,1,1,0,0,0));info.external_attr=mode<<16;info.compress_type=zipfile.ZIP_DEFLATED;z.writestr(info,data)
-    url=f'https://github.com/{REPO}/releases/download/v{VERSION}/{module.name}'
-    item={**meta,'url':url,'sha256':sha(module),'size_bytes':module.stat().st_size}
-    catalog={'schema_version':1,'name':'MagicShelf by josethevrtech','modules':[item]}
-    (out/'example-catalog.json').write_text(json.dumps(catalog,indent=2)+'\n')
-    catalog['modules']=[]
-    (out/'catalog.json').write_text(json.dumps(catalog,indent=2)+'\n')
+    # Creation packages and catalogs are released by their own repositories.
+    shutil.copy2(ROOT/'catalog.json', out/'catalog.json')
     with tempfile.TemporaryDirectory() as temp:
         payload=Path(temp)/'magicshelf';payload.mkdir()
         for name in ['magicshelf','bin']:
             shutil.copytree(ROOT/name,payload/name,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
         shutil.copy2(ROOT/'build/bin/magicshelf-vr',payload/'bin/magicshelf-vr')
-        for name in ['shelf.json','install.py','uninstall.py','LICENSE','OPENVR-LICENSE.txt','build/icon.png']:
+        for name in ['collections.json','shelf.json','install.py','uninstall.py','LICENSE','OPENVR-LICENSE.txt','build/icon.png']:
             shutil.copy2(ROOT/name,payload/Path(name).name)
         (payload/'bundled').mkdir()
         shutil.copy2(out/'catalog.json',payload/'catalog.json')
@@ -59,8 +50,8 @@ except Exception as error:
     escaped=code.replace('\\','\\\\').replace('"','\\"').replace('%','%%')
     (out/'Install.MagicShelf.desktop').write_text('[Desktop Entry]\nType=Application\nName=Install MagicShelf\nComment=Install the MagicShelf shelf and module library\nExec=python3 -c "'+escaped+'"\nIcon=applications-games\nTerminal=true\nCategories=Game;\n')
     (out/'Install.MagicShelf.desktop').chmod(0o755)
-    assets=[out/'example-catalog.json',module,archive,out/'catalog.json',bootstrap,out/'Install.MagicShelf.desktop']
+    assets=[archive,out/'catalog.json',bootstrap,out/'Install.MagicShelf.desktop']
     (out/'SHA256SUMS').write_text(''.join(sha(p)+'  '+p.name+'\n' for p in sorted(assets)))
-    print(json.dumps({'version':VERSION,'architecture':arch,'framework':str(archive),'module':str(module),'desktop':str(out/'Install.MagicShelf.desktop')},indent=2))
+    print(json.dumps({'version':VERSION,'architecture':arch,'framework':str(archive),'desktop':str(out/'Install.MagicShelf.desktop')},indent=2))
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--architecture',choices=['aarch64','x86_64'],required=True);build(parser.parse_args().architecture)

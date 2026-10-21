@@ -1,4 +1,4 @@
-"""Small stable API v1 client for tools and toy modules."""
+"""Small stable API v1 client for tools and creation modules."""
 import json
 import os
 import socket
@@ -7,7 +7,7 @@ from pathlib import Path
 def runtime_dir():
     return Path(os.environ.get("XDG_RUNTIME_DIR", "/run/user/" + str(os.getuid()))) / "magicshelf"
 
-def request(method, params=None, timeout=90):
+def request(method, params=None, timeout=235):
     packet = json.dumps({"api_version": 1, "method": method, "params": params or {}}).encode() + b"\n"
     with socket.socket(socket.AF_UNIX) as sock:
         sock.settimeout(timeout)

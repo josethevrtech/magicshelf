@@ -10,7 +10,7 @@ from pathlib import Path
 from .manager import Manager, atomic
 
 def dispatch(manager, packet):
-    if packet.get("api_version") != 1:
+    if packet.get("api_version") not in (1, 2):
         raise ValueError("Unsupported MagicShelf API version")
     method, p = packet.get("method"), packet.get("params", {})
     if not isinstance(p, dict):
@@ -28,11 +28,14 @@ def dispatch(manager, packet):
         "modules.bootstrap": lambda: manager.bootstrap(),
         "module.open": lambda: manager.open(p["id"]),
         "module.toggle": lambda: manager.toggle(p["id"], p["enabled"]),
+        "module.subscribe": lambda: manager.subscribe(p["id"], p["subscribed"], p.get("permissions")),
+        "module.link": lambda: manager.open_link(p["id"], p["index"]),
         "module.install": lambda: manager.install(p["id"], p.get("permissions")),
         "module.remove": lambda: manager.remove(p["id"]),
         "module.rollback": lambda: manager.rollback(p["id"]),
         "catalog.add": lambda: manager.add_catalog(p["url"]),
-        "catalog.refresh": lambda: manager.refresh(),
+        "catalog.refresh": lambda: manager.refresh_and_sync(),
+        "subscriptions.sync": lambda: manager.sync_subscriptions(),
         "home": lambda: manager.home_all(),
     }
     if method not in actions:
@@ -60,7 +63,7 @@ def serve():
 
     class Handler(socketserver.StreamRequestHandler):
         def handle(self):
-            self.request.settimeout(100)
+            self.request.settimeout(240)
             try:
                 line = self.rfile.readline(65537)
                 if len(line) > 65536 or not line.endswith(b"\n"):
@@ -95,6 +98,12 @@ def serve():
         def do_GET(self):
             if not self.trusted():
                 return self.send(403, b'{}')
+            if self.path.startswith("/media/"):
+                from .storefront import media_path
+                try:
+                    return self.send(200, media_path(self.path, manager.root).read_bytes(), "image/png")
+                except (OSError, ValueError):
+                    return self.send(404, b'{}')
             filename = {"/": "index.html", "/app.js": "app.js", "/style.css": "style.css"}.get(self.path)
             if not filename:
                 return self.send(404, b'{}')
@@ -130,6 +139,18 @@ def serve():
             time.sleep(1)
     threading.Thread(target=publish, daemon=True).start()
     threading.Thread(target=manager.reconcile, daemon=True).start()
+    def subscriptions():
+        # No application scheduler or cron entry is needed: the installed manager
+        # follows subscriptions for as long as the user's session is running.
+        time.sleep(10)
+        while True:
+            try:
+                if not manager.busy:
+                    manager.sync_subscriptions()
+            except Exception as error:
+                manager.update_message = "Automatic updates will retry: " + str(error)[:180]
+            time.sleep(15 * 60)
+    threading.Thread(target=subscriptions, daemon=True).start()
     try:
         server.serve_forever()
     finally:

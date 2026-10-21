@@ -1,0 +1,14 @@
+These are screenshots/renders from the user's existing MagicShelf installation,
+not redistributable game files or 3D model source. Underlying art retains its
+original attribution and license; these images are not covered by the code's MIT license.
+
+phone.png, phone-settings.png: original procedural Android Phone geometry and
+MagicShelf interface created for josethevrtech's installation.
+
+digivice.png, digivice-back.png: Jojogape's Smartphone Digivice model v1.1,
+Courage case. Artist-provided personal-use model; no use for profit.
+Artist profile supplied by the user: https://x.com/jojogape
+Displayed Digital Partner game and sprites: Aludeku.
+https://aludeku.itch.io/digital-partner-digimon
+Digimon characters/designs belong to their respective rights holders.
+These renders show a demonstration session, not the user's current saved pet.

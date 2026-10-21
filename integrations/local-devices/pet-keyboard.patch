@@ -1,0 +1,153 @@
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -4,6 +4,7 @@
+ #include "input.h"
+ #include "placement.h"
+ #include "resume.h"
++#include "pet_text_input.h"
+ #include "phone_ui.h"
+ #include "android_bridge.h"
+ #include "android_touch.h"
+@@ -62,7 +63,14 @@
+   json_object_put(settings);}
+  auto save=[&](){auto*j=json_object_new_object();json_object_object_add(j,"app",json_object_new_string(androidOpen?"android":"pet"));json_object_object_add(j,"brightness",json_object_new_double(brightness));json_object_object_add(j,"visible",json_object_new_boolean(visible));json_object_object_add(j,"wrist",json_object_new_boolean(wrist));json_object_object_add(j,"docked",json_object_new_boolean(docked));json_object_object_add(j,"size",json_object_new_double(size));json_object_object_add(j,"yaw",json_object_new_double(yaw));json_object_object_add(j,"mode",json_object_new_int(mode));if(placed&&validRoomPose(world)){auto*a=json_object_new_array();for(float v:world)json_object_array_add(a,json_object_new_double(v));json_object_object_add(j,"room_pose",a);}json_object_to_file((base+"/"+SettingsFile+".tmp").c_str(),j);json_object_put(j);fs::rename(base+"/"+SettingsFile+".tmp",base+"/"+SettingsFile);};
+  auto recenter=[&](M head){grab.end();docked=false;V p=point(head,{-.12f,-.10f,-.60f}),h=point(head,{0,0,0});V z=norm(sub(h,p)),x=norm(cross({0,1,0},z)),y=cross(z,x);world=pose(x,y,z,p);placed=true;};
+- auto keyboard=[&](){check(ov->ShowKeyboardForOverlay(device,k_EGamepadTextInputModeNormal,k_EGamepadTextInputLineModeSingleLine,KeyboardFlag_Minimal|KeyboardFlag_Modal,AppTitle,256,"",0),"keyboard");};
++ bool keyboardOwned=false;PetKeyboardRequest petKeyboard;
++ auto closeKeyboard=[&](){petKeyboard.cancel();if(keyboardOwned){ov->HideKeyboard();keyboardOwned=false;}};
++ auto keyboard=[&](){
++  if(keyboardOwned)return;
++  auto result=ov->ShowKeyboardForOverlay(device,k_EGamepadTextInputModeNormal,k_EGamepadTextInputLineModeSingleLine,KeyboardFlag_Minimal|KeyboardFlag_Modal,AppTitle,256,"",0);
++  if(result!=VROverlayError_None){std::cerr<<"Keyboard unavailable: "<<ov->GetOverlayErrorNameFromEnum(result)<<"\n";return;}
++  keyboardOwned=true;std::cerr<<"Headset keyboard opened\n";
++ };
+  AutoResume autoresume(base);std::unique_ptr<Capture>capture;std::unique_ptr<GameInput>input;uint32_t node=0;uint64_t uploaded=0;double started=0;bool hasFrame=false;auto lastSource=std::chrono::steady_clock::now()-std::chrono::seconds(5);
+  std::unique_ptr<Capture>androidCapture;std::unique_ptr<AndroidTouch>androidInput;uint32_t androidNode=0;uint64_t androidUploaded=0;double androidStarted=0;
+  auto lastUI=lastSource;auto lastSettingsTap=lastSource;
+@@ -70,7 +78,7 @@
+  bool pointerOnScreen=false,pointerOnHandle=false,queuedClick=false,brightnessDragging=false;VREvent_t lastPointer{};
+  uint32_t pointerController=k_unTrackedDeviceIndexInvalid;int pointerX=0,pointerY=0;
+  auto finishBrightness=[&](){if(!brightnessDragging)return;brightnessDragging=false;lastBrightnessCommand=std::chrono::steady_clock::now();save();androidCommand("{\"op\":\"brightness\",\"value\":"+std::to_string(brightness)+"}");};
+- auto toggleSettings=[&](bool open){finishBrightness();if(androidInput)androidInput->end();settingsOpen=open;dirty=true;if(!open){uploaded=0;androidUploaded=0;}};
++ auto toggleSettings=[&](bool open){closeKeyboard();finishBrightness();if(androidInput)androidInput->end();settingsOpen=open;dirty=true;if(!open){uploaded=0;androidUploaded=0;}};
+  auto openFromLauncher=[&](){docked=false;visible=true;toggleSettings(true);recallRequested=true;};
+  auto returnToDock=[&](const char*reason="command"){
+   if(dock.slot<0)return;
+@@ -97,6 +105,10 @@
+     }json_object_put(c);}
+   }
+   if(capture){capture->poll();if(capture->frames!=uploaded){if(!androidOpen&&!settingsOpen&&visible)renderer.screenPixels(capture->info.size.width,capture->info.size.height,capture->rgba.data());uploaded=capture->frames;if(!hasFrame){hasFrame=true;dirty=true;std::cerr<<"Live game screen received\n";}}}if(input){input->tick();if(capture&&hasFrame)autoresume.tick(*capture,*input);}
++  if(petKeyboard.take(now)&&!AndroidOnly&&visible&&!settingsOpen&&!grab.active&&input&&capture&&hasFrame&&!capture->failed
++     &&petTextFieldAt(capture->rgba,capture->info.size.width,capture->info.size.height,petKeyboard.x,petKeyboard.y)){
++   input->end();keyboard();
++  }
+   if(androidCapture){androidCapture->poll();if(androidCapture->frames!=androidUploaded){if(androidOpen&&!settingsOpen&&visible)renderer.screenPixels(androidCapture->info.size.width,androidCapture->info.size.height,androidCapture->rgba.data());androidUploaded=androidCapture->frames;if(!androidHasFrame){androidHasFrame=true;dirty=true;std::cerr<<"Android screen received\n";}}}if(androidInput)androidInput->tick();
+   TrackedDevicePose_t poses[k_unMaxTrackedDeviceCount];VRSystem()->GetDeviceToAbsoluteTrackingPose(TrackingUniverseStanding,.011f,poses,k_unMaxTrackedDeviceCount);M head=fromvr(poses[0].mDeviceToAbsoluteTracking);dock.refresh();dock.show(poses[0].bPoseIsValid);if(dock.takeHomeRequest()&&visible)returnToDock("layout changed");if(!placed&&!docked&&poses[0].bPoseIsValid)recenter(head);
+   if(recallRequested&&poses[0].bPoseIsValid){auto left=VRSystem()->GetTrackedDeviceIndexForControllerRole(TrackedControllerRole_LeftHand);if(!wrist||left>=k_unMaxTrackedDeviceCount||!poses[left].bPoseIsValid){recenter(head);haveWristPose=false;}recallRequested=false;save();}
+@@ -105,7 +117,10 @@
+    else{world=grab.follow(fromvr(poses[grab.controller].mDeviceToAbsoluteTracking));VRControllerState_t state{};
+     if(grab.watchTriggerRelease&&VRSystem()->GetControllerState(grab.controller,&state,sizeof(state))&&!(state.ulButtonPressed&ButtonMaskFromId(k_EButton_SteamVR_Trigger))){releaseGrab();}}
+   }
+-  VREvent_t e;while(VRSystem()->PollNextEvent(&e,sizeof(e))){if(dockResetEvent(e.eventType))resetPlacement(e.eventType);if(e.eventType==VREvent_Quit){VRSystem()->AcknowledgeQuit_Exiting();running=0;}}
++  VREvent_t e;while(VRSystem()->PollNextEvent(&e,sizeof(e))){
++   if(e.eventType==VREvent_KeyboardOpened_Global)keyboardOwned=e.data.keyboard.overlayHandle==device;
++   if(e.eventType==VREvent_KeyboardClosed_Global&&e.data.keyboard.overlayHandle==device)keyboardOwned=false;
++   if(dockResetEvent(e.eventType))resetPlacement(e.eventType);if(e.eventType==VREvent_Quit){VRSystem()->AcknowledgeQuit_Exiting();running=0;}}
+   while(dash&&ov->PollNextOverlayEvent(dash,&e,sizeof(e))){
+    if(dockResetEvent(e.eventType))resetPlacement(e.eventType);
+    if(e.eventType==VREvent_Quit)running=0;
+@@ -129,7 +144,9 @@
+    if(e.eventType==VREvent_MouseButtonUp&&e.data.mouse.button==VRMouseButton_Left)finishBrightness();
+    if(e.eventType==VREvent_MouseButtonUp&&e.data.mouse.button==VRMouseButton_Left&&androidInput)androidInput->end();
+    if(e.eventType==VREvent_MouseButtonUp&&e.data.mouse.button==VRMouseButton_Left&&grab.active){if(e.trackedDeviceIndex==grab.controller||e.trackedDeviceIndex==k_unTrackedDeviceIndexInvalid||e.trackedDeviceIndex==0){releaseGrab();}continue;}
++   if(e.eventType==VREvent_KeyboardClosed)keyboardOwned=false;
+    if(grab.active)continue;
++   // Read chars only from this overlay, not the duplicate global VR events.
+    if(e.eventType==VREvent_KeyboardCharInput&&!settingsOpen){std::string value(e.data.keyboard.cNewInput,strnlen(e.data.keyboard.cNewInput,8));if(androidOpen&&androidInput)androidInput->text(value);else if(input)input->text(value);}
+    if(e.eventType!=VREvent_MouseMove&&e.eventType!=VREvent_MouseButtonDown)continue;
+    if(e.eventType==VREvent_MouseButtonDown&&e.data.mouse.button!=VRMouseButton_Left)continue;
+@@ -149,7 +166,7 @@
+     VRControllerState_t state{};bool watch=VRSystem()->GetControllerState(index,&state,sizeof(state))&&(state.ulButtonPressed&ButtonMaskFromId(k_EButton_SteamVR_Trigger));
+     V grabPoint=point(lastModel,mul(hit,lastSize));
+     if(docked){world=undockedRoomPose(lastModel,yaw);V restoredPoint=point(mm(world,yawPose(yaw)),mul(hit,size));for(int axis=0;axis<3;axis++)world[12+axis]+=grabPoint[axis]-restoredPoint[axis];placed=true;docked=false;save();std::cerr<<"Creation taken out of dock\n";}
+-    finishBrightness();if(androidInput)androidInput->end();if(input)input->end();pointerOnScreen=false;queuedClick=false;
++    closeKeyboard();finishBrightness();if(androidInput)androidInput->end();if(input)input->end();pointerOnScreen=false;queuedClick=false;
+     shake.reset();dockCandidate=false;grab.beginAt(index,fromvr(poses[index].mDeviceToAbsoluteTracking),world,grabPoint,watch);
+     ov->TriggerLaserMouseHapticVibration(device,.035f,80,.25f);std::cerr<<"Room grab began: controller "<<index<<"\n";continue;
+    }
+@@ -191,7 +208,11 @@
+      continue;
+     }
+     if(androidOpen){if(androidInput&&androidHasFrame){if(down){androidInput->stopScroll();if(simulatedClick)androidInput->tap(x,y);else androidInput->begin(x,y);}else androidInput->move(x,y);}continue;}
+-    if(input&&hasFrame){if(down){autoresume.cancel();input->tap(x,y);std::cerr<<"Game tap "<<x<<","<<y<<"\n";}else input->move(x,y);}
++    if(input&&hasFrame){if(down){autoresume.cancel();input->tap(x,y);
++     bool field=capture&&!capture->failed&&petTextFieldAt(capture->rgba,capture->info.size.width,capture->info.size.height,x,y);
++     petKeyboard.tap(field&&!keyboardOwned,x,y,now);
++     std::cerr<<"Game tap "<<x<<","<<y<<(field?" text field":"")<<"\n";
++    }else input->move(x,y);}
+    }else{finishBrightness();if(androidInput&&androidOpen)androidInput->end();}
+   }
+   if(navigation){
+@@ -242,5 +263,5 @@
+   if(!ready){ftruncate(lock,0);std::string pid=std::to_string(getpid());pwrite(lock,pid.data(),pid.size(),0);std::cerr<<AppTitle<<" ready\n";ready=true;}
+   bool active=VRSystem()->GetTrackedDeviceActivityLevel(0)==k_EDeviceActivityLevel_UserInteraction;std::this_thread::sleep_for(std::chrono::milliseconds(active&&visible?22:100));
+  }
+- dock.destroy();ov->DestroyOverlay(device);if(dash)ov->DestroyOverlay(dash);VR_Shutdown();close(lock);return 0;
++ closeKeyboard();dock.destroy();ov->DestroyOverlay(device);if(dash)ov->DestroyOverlay(dash);VR_Shutdown();close(lock);return 0;
+  }catch(std::exception&e){std::cerr<<AppTitle<<": "<<e.what()<<"\n";VR_Shutdown();return 1;}}
+--- /dev/null
++++ b/src/pet_text_input.h
+@@ -0,0 +1,53 @@
++#pragma once
++#include <algorithm>
++#include <chrono>
++#include <cstdlib>
++#include <vector>
++
++// PC 1.1.9 draws its own input widgets. Their keyboard_virtual_show calls do
++// nothing on Windows, so X11 cannot report edit focus. Recognize the input
++// sprite's double border, not a fixed screen coordinate or the entered text.
++inline bool petTextFieldAt(const std::vector<unsigned char>& rgba,
++                           int w,int h,int x,int y){
++ if(w!=480||h!=1046||rgba.size()!=size_t(w)*h*4||x<0||x>=w||y<0||y>=h)return false;
++ auto color=[&](int px,int py,int r,int g,int b){
++  const auto*p=&rgba[(py*w+px)*4];
++  return std::abs(int(p[0])-r)<=10&&std::abs(int(p[1])-g)<=10&&std::abs(int(p[2])-b)<=10;
++ };
++ auto edge=[&](int px,int py){return color(px,py,99,155,255);};
++ for(int top=std::max(0,y-55);top<=y;top++){
++  if(!edge(x,top))continue;
++  int left=x,right=x;
++  while(left>0&&edge(left-1,top))--left;
++  while(right+1<w&&edge(right+1,top))++right;
++  if(right-left<320||right-left>410)continue;
++  for(int bottom=std::max(y,top+40);bottom<std::min(h,top+56);bottom++){
++   if(!edge(x,bottom))continue;
++   bool match=true;
++   for(int px=left;px<=right&&match;px+=3)match=edge(px,top)&&edge(px,bottom);
++   for(int py=top;py<=bottom&&match;py+=3)match=edge(left,py)&&edge(right,py);
++   // The cyan inset distinguishes a text field from other blue game panels.
++   for(int px=left+5;px<=right-5&&match;px+=3){
++    match=color(px,top+5,95,205,228)&&color(px,bottom-5,95,205,228)
++       &&color(px,top+3,192,212,246)&&color(px,bottom-3,192,212,246);
++   }
++   for(int py=top+5;py<=bottom-5&&match;py+=3)
++    match=color(left+5,py,95,205,228)&&color(right-5,py,95,205,228);
++   if(match)return true;
++  }
++ }
++ return false;
++}
++
++struct PetKeyboardRequest{
++ using Clock=std::chrono::steady_clock;
++ bool pending=false;int x=0,y=0;Clock::time_point due{};
++ void cancel(){pending=false;}
++ void tap(bool field,int px,int py,Clock::time_point now){
++  pending=field;x=px;y=py;due=now+std::chrono::milliseconds(140);
++ }
++ bool take(Clock::time_point now){
++  if(!pending||now<due)return false;
++  pending=false;return true;
++ }
++};

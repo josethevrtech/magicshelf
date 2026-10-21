@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "catalogs": [
+    "https://github.com/josethevrtech/magicshelf-android-phone/releases/latest/download/catalog.json",
+    "https://github.com/josethevrtech/magicshelf-digivice/releases/latest/download/catalog.json"
+  ]
+}

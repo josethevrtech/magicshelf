@@ -12,11 +12,12 @@ from pathlib import Path
 from . import VERSION
 from .contracts import ContractError, MAX_MODULES, catalog, load, machine, require, version
 from .packages import download, unpack
+from .storefront import cache_images, decorate
 
 OFFICIAL = "https://raw.githubusercontent.com/josethevrtech/magicshelf/main/catalog.json"
 ADAPTERS = {
-    "org.magicshelf.android-phone": {"name": "Android Phone", "description": "Your existing Android phone. Turning it off hides the device; Android keeps its apps running.", "overlay": "local.androidphone.device", "shell": "android-phone-vr.service", "backends": ["digitalpartner-android.service", "android-phone-bridge.service"], "binary": "android-phone-vr"},
-    "org.magicshelf.digital-partner": {"name": "Digivice", "description": "Your existing Digital Partner. Turning it off hides the device; your pet keeps running.", "overlay": "local.digitalpartner.device", "shell": "digitalpartner-vr.service", "backends": ["digitalpartner.service"], "binary": "digitalpartner-vr"},
+    "org.magicshelf.android-phone": {"name": "Android Phone", "description": "Your Android phone. Off pauses Android and its audio; On resumes your apps.", "overlay": "local.androidphone.device", "shell": "android-phone-vr.service", "backends": ["digitalpartner-android.service", "android-phone-bridge.service"], "binary": "android-phone-vr", "container": "lepton-courage-tablet"},
+    "org.magicshelf.digital-partner": {"name": "Digivice", "description": "Your Digital Partner. Off pauses the game and its audio; On resumes your pet.", "overlay": "local.digitalpartner.device", "shell": "digitalpartner-vr.service", "backends": ["digitalpartner.service"], "binary": "digitalpartner-vr"},
 }
 
 def atomic(path, data):
@@ -39,10 +40,24 @@ def quote(value):
 
 class System:
     def call(self, *args, check=True):
-        return subprocess.run(["systemctl", "--user", *args], check=check, text=True, capture_output=True, timeout=45)
+        return subprocess.run(["systemctl", "--user", *args], check=check, text=True, capture_output=True, timeout=70)
 
     def active(self, unit):
         return self.call("is-active", "--quiet", unit, check=False).returncode == 0
+
+    def pause_container(self, name, paused):
+        # Lepton's Android processes live in a separate Podman scope, outside
+        # the gamescope service. Freeze that exact container as well.
+        result = subprocess.run(["podman", "ps", "--all", "--filter", "name=^" + name + "$", "--format", "json"],
+                                check=True, text=True, capture_output=True, timeout=15)
+        for item in json.loads(result.stdout):
+            if name not in item.get("Names", []):
+                continue
+            require(item.get("Labels", {}).get("lepton") == "true", "Android container does not belong to Lepton")
+            expected = "running" if paused else "paused"
+            if item["State"] == expected:
+                subprocess.run(["podman", "pause" if paused else "unpause", item["Id"]],
+                               check=True, text=True, capture_output=True, timeout=15)
 
 class Manager:
     def __init__(self, home=None, runtime=None, system=None):
@@ -58,8 +73,15 @@ class Manager:
         self.legacy = self.home / "Applications/DigitalPartner/vr"
         self.statepath = self.config / "state.json"
         seed = Path(__file__).resolve().parent.parent / "catalog.json"
+        collections = seed.with_name('collections.json')
+        default_catalogs = [OFFICIAL]
+        if collections.exists():
+            from .packages import check_url
+            defaults = load(collections)
+            require(defaults.get('schema_version') == 1, 'Unsupported collections schema')
+            default_catalogs += [check_url(url) for url in defaults['catalogs']]
         initial = [{**i, "catalog_url": OFFICIAL} for i in catalog(load(seed))["modules"] if i["architecture"] == machine()] if seed.exists() else []
-        self.state = load(self.statepath) if self.statepath.exists() else {"schema_version": 1, "modules": {}, "catalogs": [OFFICIAL], "catalog": initial}
+        self.state = load(self.statepath) if self.statepath.exists() else {"schema_version": 1, "modules": {}, "catalogs": default_catalogs, "catalog": initial}
         require(self.state.get("schema_version") == 1 and isinstance(self.state.get("modules"), dict), "Unsupported MagicShelf state; restore the backup before continuing")
         self.layoutpath = self.config / "object-dock.json"
         if not self.layoutpath.exists():
@@ -68,6 +90,8 @@ class Manager:
         self.sessionpath = self.config / "sessions.json"
         self.sessions = load(self.sessionpath) if self.sessionpath.exists() else {}
         self.ready = set()
+        self.state.setdefault("subscriptions", {})
+        self.update_message = "Subscriptions check for updates automatically."
         self.message = "Ready"
         self.busy = False
         self.publish()
@@ -84,14 +108,14 @@ class Manager:
                 self.publish()
 
     def save(self):
-        require(sum(bool(v.get("enabled")) for v in self.state["modules"].values()) <= MAX_MODULES, "The shelf supports up to 16 enabled toys")
+        require(sum(bool(v.get("enabled")) for v in self.state["modules"].values()) <= MAX_MODULES, "The shelf supports up to 16 enabled creations")
         atomic(self.statepath, self.state)
         self.layout()
 
     def layout(self):
         data = load(self.layoutpath)
-        data["objects"] = [ADAPTERS[k]["overlay"] if k in ADAPTERS else "magicshelf.module." + k for k, v in self.state["modules"].items() if v.get("enabled")]
-        require(len(data["objects"]) <= MAX_MODULES, "The shelf supports up to 16 enabled toys")
+        data["objects"] = [ADAPTERS[k]["overlay"] if self.is_adapter(k) else "magicshelf.module." + k for k, v in self.state["modules"].items() if v.get("enabled")]
+        require(len(data["objects"]) <= MAX_MODULES, "The shelf supports up to 16 enabled creations")
         atomic(self.layoutpath, data)
 
     def adopt(self):
@@ -106,20 +130,23 @@ class Manager:
             self.message = "Existing devices added; their app data stays in place."
         return self.snapshot()
 
+    def is_adapter(self, key):
+        return key in ADAPTERS and bool(self.state['modules'].get(key, {}).get('adapter'))
+
     def unit(self, key):
-        return ADAPTERS[key]["shell"] if key in ADAPTERS else "magicshelf-module-" + key + ".service"
+        return ADAPTERS[key]["shell"] if self.is_adapter(key) else "magicshelf-module-" + key + ".service"
 
     def modulepath(self, key, ver):
         return self.root / "modules" / key / "versions" / ver
 
     def metadata(self, key, state):
-        if key in ADAPTERS:
+        if self.is_adapter(key):
             return {**ADAPTERS[key], "id": key, "version": state["version"], "permissions": ["vr-overlay"], "license": "Existing local installation", "architecture": machine()}
         return load(self.modulepath(key, state["version"]) / "module.json")
 
     def write_unit(self, key):
         state = self.state["modules"][key]
-        if key in ADAPTERS:
+        if self.is_adapter(key):
             return
         meta = self.metadata(key, state)
         directory = self.modulepath(key, state["version"])
@@ -129,8 +156,16 @@ class Manager:
         self.sessions[key] = session
         atomic(self.sessionpath, self.sessions)
         self.ready.discard(key)
-        env = {"MAGICSHELF_API_VERSION": "1", "MAGICSHELF_MODULE_ID": key, "MAGICSHELF_MODULE_KEY": "magicshelf.module." + key, "MAGICSHELF_SESSION": session, "MAGICSHELF_DATA_DIR": str(data), "MAGICSHELF_RUNTIME_DIR": str(self.runtime), "MAGICSHELF_LAYOUT_DIR": str(self.config), "MAGICSHELF_SHELF_OWNER": "0"}
-        lines = ["[Unit]", "Description=MagicShelf module " + key, "BindsTo=steamvr.service", "After=steamvr.service magicshelf.service", "PartOf=steamvr.service", "StartLimitIntervalSec=60", "StartLimitBurst=3", "", "[Service]", "Type=simple", "ExecStart=" + quote(directory / meta["entrypoint"]), "WorkingDirectory=" + str(directory).replace("%", "%%"), "Restart=on-failure", "RestartSec=5", "TimeoutStopSec=10", "NoNewPrivileges=yes", "UMask=0077", "MemoryMax=" + str(meta.get("memory_mb", 256)) + "M", "MemorySwapMax=64M", "Nice=5"]
+        env = {"MAGICSHELF_API_VERSION": str(meta["api_version"]), "MAGICSHELF_MODULE_ID": key, "MAGICSHELF_MODULE_KEY": "magicshelf.module." + key, "MAGICSHELF_SESSION": session, "MAGICSHELF_DATA_DIR": str(data), "MAGICSHELF_RUNTIME_DIR": str(self.runtime), "MAGICSHELF_LAYOUT_DIR": str(self.config), "MAGICSHELF_SHELF_OWNER": "0"}
+        if meta['api_version'] == 2:
+            backend_data = self.root / 'runtime-data' / key
+            cache = self.home / '.cache/magicshelf' / key
+            backend_data.mkdir(parents=True, exist_ok=True)
+            cache.mkdir(parents=True, exist_ok=True)
+            env.update(MAGICSHELF_BACKEND_DATA_DIR=str(backend_data), MAGICSHELF_CACHE_DIR=str(cache))
+        lines = ["[Unit]", "Description=MagicShelf module " + key, "BindsTo=steamvr.service", "After=steamvr.service magicshelf.service", "PartOf=steamvr.service", "StartLimitIntervalSec=60", "StartLimitBurst=3", "", "[Service]", "Type=simple", "ExecStart=" + quote(directory / meta["entrypoint"]), "WorkingDirectory=" + str(directory).replace("%", "%%"), "Restart=on-failure", "RestartSec=5", "TimeoutStopSec=45", "NoNewPrivileges=" + ("no" if "external-runtime" in meta["permissions"] else "yes"), "UMask=0077", "MemoryMax=" + str(meta.get("memory_mb", 256)) + "M", "MemorySwapMax=64M", "Nice=5"]
+        if meta.get('cleanup_entrypoint'):
+            lines += ['ExecStopPost=' + quote(directory / meta['cleanup_entrypoint'])]
         lines += ["Environment=" + quote(k + "=" + v) for k, v in env.items()]
         lines += ["", "[Install]", "WantedBy=steamvr.service", ""]
         (self.units / self.unit(key)).write_text("\n".join(lines))
@@ -143,13 +178,14 @@ class Manager:
         self.system.call("enable", self.unit(key))
         if not self.system.active("steamvr.service"):
             return  # Enabled for the next normal SteamVR start.
-        if key in ADAPTERS:
+        if self.is_adapter(key):
+            self.resume_adapter(key)
             self.system.call("start", *ADAPTERS[key]["backends"])
         self.system.call("reset-failed", self.unit(key), check=False)
         self.system.call("start", self.unit(key))
-        until = time.monotonic() + 20
+        until = time.monotonic() + self.metadata(key, item).get("startup_timeout_sec", 20)
         while time.monotonic() < until:
-            if key in ADAPTERS:
+            if self.is_adapter(key):
                 result = subprocess.run([str(self.legacy / ADAPTERS[key]["binary"]), "--status"], timeout=3, capture_output=True)
                 if result.returncode == 0:
                     subprocess.run([str(self.legacy / ADAPTERS[key]["binary"]), "--dock"], timeout=3, check=True)
@@ -157,20 +193,44 @@ class Manager:
             elif key in self.ready and self.system.active(self.unit(key)):
                 return
             time.sleep(.25)
-        raise ContractError("Toy did not become ready; its previous version has been restored")
+        raise ContractError("Creation did not become ready; its previous version has been restored")
 
-    def hide_adapter(self, key):
+    def pause_adapter(self, key):
         marker = self.legacy / "magicshelf-api-version"
         require(marker.is_file() and marker.read_text().strip() == "2",
                 "Update the local device shells before hiding devices; this preserves their live display connection")
         if self.system.active(self.unit(key)):
             subprocess.run([str(self.legacy / ADAPTERS[key]["binary"]), "--hide"], timeout=3, check=True)
-        # Keep a running capture connected, but do not auto-start a hidden shell.
-        self.system.call("disable", self.unit(key), check=False)
+        # Keep the capture consumer connected: disconnecting it can permanently
+        # lose gamescope's source. Suspend the producers instead. Also remove
+        # their independent SteamVR autostart links, not just the shell's link.
+        self.system.call("disable", self.unit(key), *ADAPTERS[key]["backends"])
+        for unit in ADAPTERS[key]["backends"]:
+            if self.system.active(unit):
+                self.system.call("freeze", unit)
+        if "container" in ADAPTERS[key]:
+            self.system.pause_container(ADAPTERS[key]["container"], True)
+
+    def resume_adapter(self, key):
+        # Make Android available before its bridge can issue container commands.
+        if "container" in ADAPTERS[key]:
+            self.system.pause_container(ADAPTERS[key]["container"], False)
+        for unit in ADAPTERS[key]["backends"]:
+            if self.system.active(unit):
+                self.system.call("thaw", unit)
+
+    def enable_adapter(self, key):
+        if not self.system.active(self.unit(key)):
+            self.start(key)
+        else:
+            self.system.call("enable", self.unit(key))
+            self.resume_adapter(key)
+            self.system.call("start", *ADAPTERS[key]["backends"])
+            subprocess.run([str(self.legacy / ADAPTERS[key]["binary"]), "--dock"], timeout=3, check=True)
 
     def toggle(self, key, enabled):
         require(type(enabled) is bool, "enabled must be true or false")
-        require(key in self.state["modules"], "Toy is not installed")
+        require(key in self.state["modules"], "Creation is not installed")
         with self.transaction():
             old = self.state["modules"][key]["enabled"]
             require(not enabled or old or sum(bool(i["enabled"]) for i in self.state["modules"].values()) < MAX_MODULES, "The shelf is full")
@@ -178,32 +238,43 @@ class Manager:
             self.save()
             try:
                 if enabled:
-                    if not self.system.active(self.unit(key)):
+                    if self.is_adapter(key):
+                        self.enable_adapter(key)
+                    elif not self.system.active(self.unit(key)):
                         self.start(key)
-                    elif key in ADAPTERS:
-                        self.system.call("enable", self.unit(key))
-                        subprocess.run([str(self.legacy / ADAPTERS[key]["binary"]), "--dock"], timeout=3, check=True)
-                elif key in ADAPTERS:
-                    self.hide_adapter(key)
+                elif self.is_adapter(key):
+                    self.pause_adapter(key)
                 else:
                     self.system.call("disable", "--now", self.unit(key), check=False)
             except Exception:
                 self.state["modules"][key]["enabled"] = old
                 self.save()
-                if not old:
-                    if key in ADAPTERS:
-                        self.hide_adapter(key)
+                if self.is_adapter(key):
+                    if old:
+                        self.enable_adapter(key)
                     else:
-                        self.system.call("disable", "--now", self.unit(key), check=False)
+                        self.pause_adapter(key)
+                elif not old:
+                    self.system.call("disable", "--now", self.unit(key), check=False)
                 raise
             self.message = ("Enabled " if enabled else "Turned off ") + self.metadata(key, self.state["modules"][key])["name"]
         return self.snapshot()
 
+    def control(self, key, command):
+        if self.is_adapter(key):
+            executable = self.legacy / ADAPTERS[key]['binary']
+        else:
+            meta = self.metadata(key, self.state['modules'][key])
+            require(meta.get('control_entrypoint'), 'This creation has no on-device controls')
+            executable = self.modulepath(key, meta['version']) / meta['control_entrypoint']
+        env = {**os.environ, 'MAGICSHELF_DATA_DIR': str(self.root / 'module-data' / key)}
+        subprocess.run([str(executable), command], env=env, timeout=5, check=True)
+
     def open(self, key):
-        require(key in ADAPTERS and key in self.state["modules"], "This toy does not support opening from the library")
+        require(key in self.state['modules'], 'Creation is not installed')
         self.toggle(key, True)
-        subprocess.run([str(self.legacy / ADAPTERS[key]["binary"]), "--show"], timeout=3, check=True)
-        self.message = "Opened " + ADAPTERS[key]["name"]
+        self.control(key, '--show')
+        self.message = 'Opened ' + self.metadata(key, self.state['modules'][key])['name']
         return self.snapshot()
 
     def add_catalog(self, url):
@@ -230,28 +301,104 @@ class Manager:
                     download(url, path, 1024 * 1024)
                     data = catalog(load(path))
                 for item in data["modules"]:
-                    if item["id"] not in seen and item["id"] not in ADAPTERS and item["architecture"] == machine():
+                    if item["id"] not in seen and not self.is_adapter(item["id"]) and item["architecture"] == machine():
                         items.append({**item, "catalog_url": url})
                         seen.add(item["id"])
             self.state["catalog"] = items
             self.save()
             self.message = "Collection updated"
+        cache_images(items, self.root)
         return self.snapshot()
 
     def install(self, key, permissions):
-        item = next((i for i in self.state["catalog"] if i["id"] == key), None)
-        require(item is not None, "Toy is not in a followed collection")
-        require(isinstance(permissions, list) and set(permissions) == set(item["permissions"]), "Review this toy's permissions before installing")
-        old = self.state["modules"].get(key)
-        require(not old or not old.get("catalog_url") or old["catalog_url"] == item["catalog_url"], "A different collection cannot replace this toy")
         with self.transaction():
-            with tempfile.TemporaryDirectory(dir=self.root) as temp:
-                archive = Path(temp) / "module.magicshelf"
-                download(item["url"], archive, item["size_bytes"])
-                require(archive.stat().st_size == item["size_bytes"], "Package size differs from catalog")
-                staged = Path(temp) / "unpacked"
-                unpack(archive, staged, item["sha256"], item)
-                return self.commit_package(key, item["version"], staged, item["catalog_url"])
+            return self.install_item(key, permissions)
+
+    def refresh_and_sync(self):
+        self.refresh()
+        return self.sync_subscriptions(refresh=False)
+
+    def install_item(self, key, permissions):
+        # Called only while holding the manager transaction lock.
+        item = next((i for i in self.state["catalog"] if i["id"] == key), None)
+        require(item is not None, "Creation is not in a followed collection")
+        require(isinstance(permissions, list) and set(permissions) == set(item["permissions"]), "Review this creation's permissions before installing")
+        old = self.state["modules"].get(key)
+        require(not old or not old.get("catalog_url") or old["catalog_url"] == item["catalog_url"], "A different collection cannot replace this creation")
+        with tempfile.TemporaryDirectory(dir=self.root) as temp:
+            archive = Path(temp) / "module.magicshelf"
+            download(item["url"], archive, item["size_bytes"])
+            require(archive.stat().st_size == item["size_bytes"], "Package size differs from catalog")
+            staged = Path(temp) / "unpacked"
+            unpack(archive, staged, item["sha256"], item)
+            return self.commit_package(key, item["version"], staged, item["catalog_url"])
+
+    def subscribe(self, key, subscribed, permissions=None):
+        require(type(subscribed) is bool, "subscribed must be true or false")
+        with self.transaction():
+            if not subscribed:
+                self.state["subscriptions"].pop(key, None)
+                self.save()
+                self.message = "Unsubscribed. Your installed creation and saves are kept."
+            else:
+                require(not self.is_adapter(key), "This local installation has no downloadable package yet")
+                item = next((i for i in self.state["catalog"] if i["id"] == key), None)
+                require(item is not None, "Creation is not available for download")
+                require(isinstance(permissions, list) and set(permissions) == set(item["permissions"]), "Review this creation's permissions before subscribing")
+                old = self.state["modules"].get(key)
+                require(not old or not old.get("catalog_url") or old["catalog_url"] == item["catalog_url"], "A different collection cannot replace this creation")
+                if not old or version(item["version"]) > version(old["version"]):
+                    self.install_item(key, permissions)
+                self.state["subscriptions"][key] = {"catalog_url": item["catalog_url"], "permissions": list(permissions)}
+                self.save()
+                self.message = "Subscribed. Downloads and future updates are free and automatic."
+        return self.snapshot()
+
+    def sync_subscriptions(self, refresh=True):
+        if refresh:
+            try:
+                self.refresh()
+            except Exception as error:
+                self.update_message = "Updates will retry: " + str(error)[:180]
+                return self.snapshot()
+        if not self.state["subscriptions"]:
+            self.update_message = "Collection checked. Subscribe to receive automatic updates."
+            return self.snapshot()
+        failures, updated = [], 0
+        for key in list(self.state["subscriptions"]):
+            with self.transaction():
+                sub = self.state["subscriptions"].get(key)
+                if not sub:  # An unsubscribe while checking cancels this update.
+                    continue
+                item = next((i for i in self.state["catalog"] if i["id"] == key and i.get("catalog_url") == sub["catalog_url"]), None)
+                installed = self.state["modules"].get(key)
+                if not item or (installed and version(item["version"]) <= version(installed["version"])):
+                    continue
+                if not set(item["permissions"]).issubset(sub["permissions"]):
+                    failures.append(item["name"] + " needs a permissions review")
+                    continue
+                try:
+                    self.install_item(key, item["permissions"])
+                    updated += 1
+                except Exception as error:
+                    failures.append(item["name"] + ": " + str(error)[:140])
+        self.update_message = "; ".join(failures) if failures else (str(updated) + " creation(s) updated." if updated else "Your subscriptions are up to date.")
+        self.publish()
+        return self.snapshot()
+
+    def open_link(self, key, index):
+        from .contracts import external_url
+        item = next((m for m in self.snapshot()["modules"] if m["id"] == key), None)
+        require(item is not None and type(index) is int, "Unknown creation link")
+        links = list(item.get("links", []))
+        for credit in item.get("credits", []):
+            for field in ("url", "support_url"):
+                if credit.get(field):
+                    links.append({"url": credit[field]})
+        require(0 <= index < len(links), "Unknown creation link")
+        subprocess.run(["xdg-open", external_url(links[index]["url"])], check=True, timeout=10, capture_output=True)
+        self.message = "Link opened in your browser."
+        return self.snapshot()
 
     def commit_package(self, key, ver, staged, source=None):
         from copy import deepcopy
@@ -314,7 +461,7 @@ class Manager:
         return self.snapshot()
 
     def reconcile(self):
-        # Repair interrupted toggles without restarting healthy toys or backends.
+        # Repair interrupted toggles without restarting healthy creations or backends.
         with self.transaction():
             self.layout()
             for key, item in list(self.state["modules"].items()):
@@ -322,15 +469,19 @@ class Manager:
                     if item["enabled"]:
                         if not self.system.active(self.unit(key)):
                             self.start(key)
-                    elif key in ADAPTERS:
-                        self.hide_adapter(key)
+                        elif self.is_adapter(key):
+                            self.system.call("enable", self.unit(key))
+                            self.resume_adapter(key)
+                            self.system.call("start", *ADAPTERS[key]["backends"])
+                    elif self.is_adapter(key):
+                        self.pause_adapter(key)
                     else:
                         self.system.call("disable", "--now", self.unit(key), check=False)
                 except Exception as e:
-                    self.message = "Could not start " + key + ": " + str(e)
+                    self.message = "Could not apply saved state for " + key + ": " + str(e)
 
     def rollback(self, key):
-        require(key in self.state["modules"] and key not in ADAPTERS, "Only packaged toys support version rollback")
+        require(key in self.state["modules"] and not self.is_adapter(key), "Only packaged creations support version rollback")
         old = dict(self.state["modules"][key])
         previous = old.get("previous_version")
         require(previous and self.modulepath(key, previous).is_dir(), "No previous version is available")
@@ -350,7 +501,7 @@ class Manager:
                 self.save()
                 if old["enabled"]:
                     self.start(key)
-                self.message = "Restored previous toy version and its saved data"
+                self.message = "Restored previous creation version and its saved data"
             except Exception:
                 self.system.call("stop", self.unit(key), check=False)
                 if data.exists():
@@ -365,26 +516,28 @@ class Manager:
         return self.snapshot()
 
     def remove(self, key):
-        require(key in self.state["modules"], "Toy is not installed")
-        require(key not in ADAPTERS, "Local devices can be turned off; MagicShelf does not delete their existing installations")
+        require(key in self.state["modules"], "Creation is not installed")
+        require(not self.is_adapter(key), "Local devices can be turned off; MagicShelf does not delete their existing installations")
         with self.transaction():
             self.system.call("disable", "--now", self.unit(key), check=False)
             self.state["modules"].pop(key)
+            self.state["subscriptions"].pop(key, None)
             self.save()
             (self.units / self.unit(key)).unlink(missing_ok=True)
             self.system.call("daemon-reload")
             shutil.rmtree(self.root / "modules" / key)
-            self.message = "Toy removed; its saved data is kept"
+            self.message = "Creation removed; its saved data is kept"
         return self.snapshot()
 
     def home_all(self):
         for key, state in list(self.state["modules"].items()):
-            if state["enabled"] and key in ADAPTERS and self.system.active(self.unit(key)):
-                subprocess.run([str(self.legacy / ADAPTERS[key]["binary"]), "--dock"], check=True, timeout=5)
+            if state["enabled"] and self.system.active(self.unit(key)):
+                if self.is_adapter(key) or self.metadata(key, state).get("control_entrypoint"):
+                    self.control(key, "--dock")
         # New modules read their own home-generation counter through the SDK.
         data = {"api_version": 1, "generation": time.time_ns()}
         atomic(self.runtime / "home.json", data)
-        self.message = "Returned toys home"
+        self.message = "Returned creations home"
         return self.snapshot()
 
     def snapshot(self):
@@ -392,16 +545,23 @@ class Manager:
         for key, state in list(self.state["modules"].items()):
             try:
                 meta = self.metadata(key, state)
-                modules.append({**meta, "installed": True, "enabled": state["enabled"], "running": self.system.active(self.unit(key)), "adapter": key in ADAPTERS, "previous_version": state.get("previous_version")})
+                running = self.system.active(self.unit(key)) and (state["enabled"] or not self.is_adapter(key))
+                modules.append({**meta, "installed": True, "enabled": state["enabled"], "running": running, "adapter": self.is_adapter(key), "can_configure": self.is_adapter(key) or bool(meta.get("control_entrypoint")), "previous_version": state.get("previous_version")})
             except (OSError, ValueError):
-                modules.append({"id": key, "name": key, "version": state["version"], "description": "Module files are missing; restore or remove this toy.", "installed": True, "enabled": False, "running": False, "broken": True})
+                modules.append({"id": key, "name": key, "version": state["version"], "description": "Module files are missing; restore or remove this creation.", "installed": True, "enabled": False, "running": False, "broken": True})
         installed = {i["id"]: i for i in modules}
         for item in self.state["catalog"]:
             if item["id"] not in installed:
                 modules.append({**item, "installed": False, "enabled": False})
             elif version(item["version"]) > version(installed[item["id"]]["version"]):
                 installed[item["id"]]["update"] = item
-        return {"api_version": 1, "version": VERSION, "modules": modules, "catalogs": self.state["catalogs"], "busy": self.busy, "message": self.message}
+        modules = [decorate(item, self.root) for item in modules]
+        for item in modules:
+            sub = self.state["subscriptions"].get(item["id"])
+            item["subscribed"] = bool(sub)
+            item["subscription_available"] = not self.is_adapter(item["id"]) and any(i["id"] == item["id"] for i in self.state["catalog"])
+            item["update_mode"] = "local" if self.is_adapter(item["id"]) else "automatic" if sub else "manual"
+        return {"api_version": 1, "version": VERSION, "modules": modules, "catalogs": self.state["catalogs"], "busy": self.busy, "message": self.message, "update_message": self.update_message}
 
     def publish(self):
         atomic(self.runtime / "ui-state.json", self.snapshot())

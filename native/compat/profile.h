@@ -1,4 +1,8 @@
 #pragma once
+// A creation owns its geometry and identity; legacy defaults remain for API-v1 source compatibility.
+#ifdef MAGICSHELF_CREATION_PROFILE
+#include MAGICSHELF_CREATION_PROFILE
+#else
 // Both devices share the renderer and interaction code, but have separate
 // process locks, settings, registrations, captures, and model assets.
 #ifdef ANDROID_PHONE
@@ -35,3 +39,8 @@ constexpr float HomeHalfX=.020f,HomeHalfY=.014f,DefaultSize=1.6f;
 constexpr int RenderWidth=2048,RenderHeight=1024;
 #endif
 constexpr int SettingsWidth=480,SettingsHeight=1046;
+constexpr float GrabHalfWidth=.025f,GrabHalfHeight=.003f,GrabY=-BodyY-.013f;
+// The transparent stereo canvas includes the handle and its larger hit target.
+constexpr float InteractionPlaneWidth=2.f*(BodyY+.025f)>PhonePlaneWidth?2.f*(BodyY+.025f):PhonePlaneWidth;
+
+#endif
