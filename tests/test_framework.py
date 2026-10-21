@@ -35,7 +35,7 @@ class FakeSystem:
         self.calls.append(args)
         if args[0] == "start":
             self.running.update(args[1:])
-        if args[0] in ("stop", "disable"):
+        if args[0] == "stop" or (args[0] == "disable" and "--now" in args):
             self.running.difference_update(args[1:])
     def active(self, unit):
         return unit in self.running
@@ -50,6 +50,24 @@ class FrameworkTests(unittest.TestCase):
         self.manager = Manager(self.home, self.path / "runtime", self.system)
     def tearDown(self):
         self.temp.cleanup()
+
+    def test_adapter_toggle_keeps_capture_process_and_redocks(self):
+        key = "org.magicshelf.android-phone"
+        self.manager.legacy.mkdir(parents=True)
+        (self.manager.legacy / "magicshelf-api-version").write_text("2")
+        self.manager.state["modules"][key] = {"version":"0.1.0", "enabled":True, "adapter":True}
+        unit = self.manager.unit(key)
+        self.system.running.add(unit)
+        with patch("magicshelf.manager.subprocess.run") as run:
+            self.manager.toggle(key, False)
+            self.assertTrue(self.system.active(unit))
+            self.assertEqual(run.call_args.args[0][-1], "--hide")
+            self.manager.reconcile()
+            self.assertTrue(self.system.active(unit))
+            self.manager.toggle(key, True)
+            self.assertEqual(run.call_args.args[0][-1], "--dock")
+        self.assertNotIn(("disable", "--now", unit), self.system.calls)
+        self.assertNotIn(("start", unit), self.system.calls)
 
     def test_supported_contract(self):
         self.assertEqual(manifest(meta())["api_version"], 1)

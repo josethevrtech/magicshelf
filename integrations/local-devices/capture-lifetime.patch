@@ -1,0 +1,35 @@
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -19,9 +19,9 @@
+ #include <fcntl.h>
+ #include <unistd.h>
+ namespace fs=std::filesystem;using namespace vr;
+-static volatile sig_atomic_t running=1,showRequested=0,dockRequested=0;
++static volatile sig_atomic_t running=1,showRequested=0,dockRequested=0,hideRequested=0;
+ static const char*key=ApplicationKey;
+-void stop(int){running=0;}void requestShow(int){showRequested=1;}void requestDock(int){dockRequested=1;}
++void stop(int){running=0;}void requestShow(int){showRequested=1;}void requestDock(int){dockRequested=1;}void requestHide(int){hideRequested=1;}
+ void check(EVROverlayError e,const char*op){if(e)throw std::runtime_error(std::string(op)+": "+VROverlay()->GetOverlayErrorNameFromEnum(e));}
+ M fromvr(HmdMatrix34_t p){M r=identity();for(int i=0;i<3;i++)for(int j=0;j<4;j++)r[i+j*4]=p.m[i][j];return r;}
+ HmdMatrix34_t tovr(M p){HmdMatrix34_t r{};for(int i=0;i<3;i++)for(int j=0;j<4;j++)r.m[i][j]=p[i+j*4];return r;}
+@@ -31,9 +31,9 @@
+  std::string base=fs::canonical("/proc/self/exe").parent_path();
+  int lock=open((base+"/"+LockFile).c_str(),O_CREAT|O_RDWR,0600);if(lock<0)throw std::runtime_error("Cannot open lock");
+  bool held=flock(lock,LOCK_EX|LOCK_NB)!=0;bool query=argc>1&&std::string(argv[1])=="--status";
+- if(held){char b[40]={};pread(lock,b,39,0);pid_t pid=atoi(b);bool ok=pid>1&&kill(pid,0)==0;if(!query&&ok)kill(pid,argc>1&&std::string(argv[1])=="--dock"?SIGUSR2:SIGUSR1);close(lock);return ok?0:1;}
++ if(held){char b[40]={};pread(lock,b,39,0);pid_t pid=atoi(b);bool ok=pid>1&&kill(pid,0)==0;if(!query&&ok)kill(pid,argc>1&&std::string(argv[1])=="--hide"?SIGRTMIN:(argc>1&&std::string(argv[1])=="--dock"?SIGUSR2:SIGUSR1));close(lock);return ok?0:1;}
+  if(argc>1){close(lock);return 1;}
+- std::signal(SIGPIPE,SIG_IGN);std::signal(SIGUSR1,requestShow);std::signal(SIGUSR2,requestDock);std::signal(SIGTERM,stop);std::signal(SIGINT,stop);
++ std::signal(SIGPIPE,SIG_IGN);std::signal(SIGUSR1,requestShow);std::signal(SIGUSR2,requestDock);std::signal(SIGRTMIN,requestHide);std::signal(SIGTERM,stop);std::signal(SIGINT,stop);
+  EVRInitError err;VR_Init(&err,VRApplication_Background);if(err)throw std::runtime_error("Start SteamVR normally first.");VR_Shutdown();
+  VR_Init(&err,VRApplication_Overlay);if(err)throw std::runtime_error(VR_GetVRInitErrorAsEnglishDescription(err));
+  bool managed=std::getenv("MAGICSHELF_SHELF_OWNER")&&std::string(std::getenv("MAGICSHELF_SHELF_OWNER"))=="0";
+@@ -71,7 +71,7 @@
+  auto toggleSettings=[&](bool open){finishBrightness();if(androidInput)androidInput->end();settingsOpen=open;dirty=true;if(!open){uploaded=0;androidUploaded=0;}};
+  auto openFromLauncher=[&](){docked=false;visible=true;toggleSettings(true);recallRequested=true;};
+  auto returnToDock=[&](){grab.end();finishBrightness();if(androidInput)androidInput->end();docked=true;visible=true;wrist=false;recallRequested=false;pointerOnScreen=false;queuedClick=false;toggleSettings(false);save();std::cerr<<"Returned to object dock slot "<<dock.slot<<"\n";};
+- while(running){auto now=std::chrono::steady_clock::now();if(showRequested){showRequested=0;openFromLauncher();}if(dockRequested){dockRequested=0;returnToDock();}
++ while(running){auto now=std::chrono::steady_clock::now();if(hideRequested){hideRequested=0;visible=false;grab.end();recallRequested=false;pointerOnScreen=false;queuedClick=false;toggleSettings(false);save();std::cerr<<"Hidden by MagicShelf; capture kept alive\n";}if(showRequested){showRequested=0;openFromLauncher();}if(dockRequested){dockRequested=0;returnToDock();}
+   if(now-lastSource>std::chrono::seconds(2)){auto*j=AndroidOnly?nullptr:json_object_from_file((base+"/private-source.json").c_str());if(j){uint32_t n=readnum(j,"node");double st=readnum(j,"started");if(n&&(n!=node||st!=started||!capture||capture->failed)){try{capture.reset();input.reset();capture=std::make_unique<Capture>(n);input=std::make_unique<GameInput>(readstr(j,"display"));node=n;started=st;autoresume.reset(readnum(j,"autoresume",0),readnum(j,"resume_slot",1));uploaded=0;hasFrame=false;std::cerr<<"Connected private game node="<<node<<" display="<<readstr(j,"display")<<"\n";}catch(std::exception&e){std::cerr<<e.what()<<"\n";}}json_object_put(j);}auto*aj=AndroidOnly?json_object_from_file((base+"/android-source.json").c_str()):nullptr;
+    if(aj){uint32_t n=readnum(aj,"node");double st=readnum(aj,"started");if(n&&(n!=androidNode||st!=androidStarted||!androidCapture||androidCapture->failed)){try{androidInput.reset();androidCapture.reset();androidHasFrame=false;androidCapture=std::make_unique<Capture>(n,720,1600);androidInput=std::make_unique<AndroidTouch>(readstr(aj,"display"));androidNode=n;androidStarted=st;androidUploaded=0;std::cerr<<"Connected Android display "<<readstr(aj,"display")<<" node="<<n<<"\n";}catch(std::exception&e){std::cerr<<"Android: "<<e.what()<<"\n";}}json_object_put(aj);}else{androidInput.reset();androidCapture.reset();androidHasFrame=false;}
+    lastSource=now;dirty=true;}

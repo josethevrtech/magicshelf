@@ -96,7 +96,7 @@ class Manager:
 
     def adopt(self):
         marker = self.legacy / "magicshelf-api-version"
-        require(marker.is_file() and marker.read_text().strip() == "1", "Migrate the local device shells before adding them to MagicShelf")
+        require(marker.is_file() and marker.read_text().strip() in ("1", "2"), "Migrate the local device shells before adding them to MagicShelf")
         with self.transaction():
             for key, item in ADAPTERS.items():
                 if (self.legacy / item["binary"]).is_file() and key not in self.state["modules"]:
@@ -159,6 +159,15 @@ class Manager:
             time.sleep(.25)
         raise ContractError("Toy did not become ready; its previous version has been restored")
 
+    def hide_adapter(self, key):
+        marker = self.legacy / "magicshelf-api-version"
+        require(marker.is_file() and marker.read_text().strip() == "2",
+                "Update the local device shells before hiding devices; this preserves their live display connection")
+        if self.system.active(self.unit(key)):
+            subprocess.run([str(self.legacy / ADAPTERS[key]["binary"]), "--hide"], timeout=3, check=True)
+        # Keep a running capture connected, but do not auto-start a hidden shell.
+        self.system.call("disable", self.unit(key), check=False)
+
     def toggle(self, key, enabled):
         require(type(enabled) is bool, "enabled must be true or false")
         require(key in self.state["modules"], "Toy is not installed")
@@ -171,13 +180,21 @@ class Manager:
                 if enabled:
                     if not self.system.active(self.unit(key)):
                         self.start(key)
+                    elif key in ADAPTERS:
+                        self.system.call("enable", self.unit(key))
+                        subprocess.run([str(self.legacy / ADAPTERS[key]["binary"]), "--dock"], timeout=3, check=True)
+                elif key in ADAPTERS:
+                    self.hide_adapter(key)
                 else:
                     self.system.call("disable", "--now", self.unit(key), check=False)
             except Exception:
                 self.state["modules"][key]["enabled"] = old
                 self.save()
                 if not old:
-                    self.system.call("disable", "--now", self.unit(key), check=False)
+                    if key in ADAPTERS:
+                        self.hide_adapter(key)
+                    else:
+                        self.system.call("disable", "--now", self.unit(key), check=False)
                 raise
             self.message = ("Enabled " if enabled else "Turned off ") + self.metadata(key, self.state["modules"][key])["name"]
         return self.snapshot()
@@ -305,6 +322,8 @@ class Manager:
                     if item["enabled"]:
                         if not self.system.active(self.unit(key)):
                             self.start(key)
+                    elif key in ADAPTERS:
+                        self.hide_adapter(key)
                     else:
                         self.system.call("disable", "--now", self.unit(key), check=False)
                 except Exception as e:

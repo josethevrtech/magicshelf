@@ -7,7 +7,7 @@ once, follow a collection, then choose which toys belong on your shelf.
 
 ## Install
 
-In Desktop Mode, download [Install.MagicShelf.desktop](https://github.com/josethevrtech/magicshelf/releases/download/v0.1.2/Install.MagicShelf.desktop)
+In Desktop Mode, download [Install.MagicShelf.desktop](https://github.com/josethevrtech/magicshelf/releases/download/v0.1.3/Install.MagicShelf.desktop)
 to your desktop and double-click it. If your desktop asks whether to execute or
 trust the downloaded launcher, allow it. Open the new **MagicShelf** shortcut or
 select **MagicShelf** in SteamVR's dashboard.
@@ -34,8 +34,9 @@ is recorded in [docs/VALIDATION.md](docs/VALIDATION.md).
 **Pocket Clock** is an optional developer example, excluded from the default shelf.
 MagicShelf is the single dashboard entry; use **Open** in its library for either device.
 The existing Android phone and Digivice can be adopted on a migrated installation.
-Their switches control their visual shells; their existing app backends keep
-running to preserve the Android session and pet. MagicShelf does not distribute
+Their switches hide/show the devices while keeping the shells and capture
+connections alive to preserve the Android session and pet. Local adapter
+capability v2 is required for this behavior. MagicShelf does not distribute
 the Android image, the Digital Partner game, or third-party Digivice artwork.
 
 The shelf appears beside Steam's launcher and hides while the launcher is closed

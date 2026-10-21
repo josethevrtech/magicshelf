@@ -124,3 +124,12 @@ framework state. Rollback cannot undo arbitrary changes a trusted module makes
 outside its data directory; design toys to write only inside their assigned data.
 
 See [RELEASING.md](RELEASING.md) for the publishing checklist.
+
+## Local device adapters
+
+The existing phone and Digivice are adapters, not packaged modules. Their
+capability marker `magicshelf-api-version` is independent of module API v1.
+Adapter capability 2 adds `--hide`, which must release held input and hide the
+object without stopping capture. `--dock` shows the same process in its shelf
+slot. MagicShelf refuses hiding capability-1 adapters until their local shells
+are upgraded. Packaged modules still stop when disabled.
