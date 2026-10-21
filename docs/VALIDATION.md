@@ -370,3 +370,22 @@ The diagnostic browser UI uses the same switch and retains accessible state.
 
 MagicShelf 0.3.5 is installed locally; the public framework installer remains
 0.1.3. Public creation releases are Phone 0.2.3 and Digivice 0.2.3.
+
+## Discover navigation cleanup 0.3.6 — October 21, 2026
+
+Removed the upper-right **Return creations home** button from the native app and
+diagnostic browser UI. Discover remains the collection's home navigation: its
+existing handler clears the selected creation and pending review and returns to
+page one. The browser navigation also resets its category and search filters.
+
+- All 69 Python tests pass locally. Existing native navigation and hit-target
+  checks pass locally and on the Frame; diagnostic JavaScript parses.
+- The ARM build and verified installer succeeded. A live 2560 × 1800 capture
+  confirms the upper-right button is gone.
+- App preferences, creation versions, subscriptions and On/Off states were
+  unchanged. Android Phone (Virtual) 0.2.5 remained running and Smartphone
+  Digivice 0.2.4 remained Off. Creation and SteamVR process IDs were unchanged.
+  Both MagicShelf services are active with zero automatic restarts.
+
+MagicShelf 0.3.6 is installed locally; the public framework installer remains
+0.1.3. Category browsing for the native collection is future work.

@@ -72,7 +72,7 @@ struct StoreUI{
   working=busy;buttons.clear();c.fill(0,0,0);sidebar(c,state);
   auto*m=find(state,selected);if(!selected.empty()&&!m)selected.clear();
   if(m)text(c,254,55,"Collection / "+textfield(m,"name"),17,true,670);
-  button(c,1010,25,238,"Return creations home","home");c.rect(254,94,994,1,.08,.13,.20);
+  c.rect(254,94,994,1,.08,.13,.20);
   if(!reviewId.empty())review(c,state);else if(m)detail(c,m,state);else if(view=="settings")preferences(c,state);else collection(c,state);
   auto*t=field(state,"transfer");std::string status=boolfield(t,"active")?transferLabel(t)+" · "+textfield(t,"name"):busy?"Updating your shelf... You can keep browsing.":message;
   c.rect(254,848,994,1,.08,.13,.20);text(c,254,869,status,14,true,994);text(c,254,891,textfield(state,"update_message"),12,true,994);
