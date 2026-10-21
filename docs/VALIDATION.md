@@ -342,3 +342,31 @@ in everyday language while preserving the underlying approval values.
 
 Headset confirmation of the new card controls and permission wording is pending.
 This is a local installation; the public framework installer remains 0.1.3.
+
+## Compact power switches and Android preview 0.3.5 — October 21, 2026
+
+The user's live capture confirmed that the combined On/Turn off button was too
+large and the Phone gallery showed a browser. Collection cards and detail pages
+now use a compact switch labeled only On or Off, with a 116 × 48 logical hit
+target. The duplicated power button inside the detail Settings tab is removed.
+The diagnostic browser UI uses the same switch and retains accessible state.
+
+- All 69 Python tests and native storefront control checks pass locally and on
+  the Frame. Existing tests cover toggle values, creation identity, navigation,
+  busy states and non-overlapping hit targets. Diagnostic JavaScript parses.
+- The ARM build and normal installer succeeded. App preferences were unchanged,
+  and the Phone kept its running process during the framework upgrade. Both
+  MagicShelf services remained active with zero automatic restarts.
+- Phone 0.2.3 independently publishes a gallery-only update: an actual Android
+  home-screen capture rendered in the original phone model. Its runtime and
+  permissions are unchanged. ARM build and release workflows passed, and the
+  public release includes its package, checksums and catalog.
+- The existing subscription downloaded and installed Phone 0.2.3 automatically.
+  It remained enabled, running and subscribed; the new screenshot was cached.
+  Digivice remained uninstalled. SteamVR was not restarted.
+- A live 2560 × 1800 dashboard capture confirms the compact On switch and Android
+  home-screen preview on the collection card. Native detail previews were also
+  inspected. Headset comfort with the smaller switch remains a user judgment.
+
+MagicShelf 0.3.5 is installed locally; the public framework installer remains
+0.1.3. Public creation releases are Phone 0.2.3 and Digivice 0.2.3.

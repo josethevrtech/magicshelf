@@ -23,7 +23,7 @@ BUILTINS = {
         'tagline': 'A little Android. A lot of possibility.',
         'description': 'Your own Android phone, right beside you in VR.',
         'about': 'Keep your Android apps within reach. Pick up the phone, move it around your space, or return it to the shelf. Its screen supports controller taps, swipes, typing and brightness controls. Turn it off to pause Android and its audio; turn it on to pick up where you left off.',
-        'screenshots': [{'asset': 'phone.png', 'caption': 'The original graphite phone, rendered by MagicShelf.'}, {'asset': 'phone-settings.png', 'caption': 'On-device controls for brightness, size and placement.'}],
+        'screenshots': [{'asset': 'phone.png', 'caption': 'The Android home screen on the original MagicShelf phone.'}, {'asset': 'phone-settings.png', 'caption': 'On-device controls for brightness, size and placement.'}],
         'links': [{'label': 'Android Phone on GitHub', 'url': 'https://github.com/josethevrtech/magicshelf-android-phone'}, {'label': 'MagicShelf framework', 'url': PROJECT}],
         'credits': [{'name': 'josethevrtech', 'role': 'Creation, original phone model and integration', 'url': 'https://github.com/josethevrtech', 'license': 'Original procedural phone geometry.'}],
     },

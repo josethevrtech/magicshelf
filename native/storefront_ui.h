@@ -46,7 +46,13 @@ struct StoreUI{
  void progressBar(Canvas&c,json_object*t,int x,int y,int width){
   round(c,x,y,width,7,3,.06,.12,.20);double fill=width*fraction(t);if(fill>0)c.rect(x,y,std::max(1,int(fill)),7,.36,.66,1.0);
  }
- void power(Canvas&c,json_object*m,int x,int y,int width=144){bool on=boolfield(m,"enabled");button(c,x,y,width,on?"On  |  Turn off":"Off  |  Turn on","module.toggle",argsFor(textfield(m,"id"),"enabled",json_object_new_boolean(!on)),on);}
+ void power(Canvas&c,json_object*m,int x,int y){
+  bool on=boolfield(m,"enabled");auto params=argsFor(textfield(m,"id"),"enabled",json_object_new_boolean(!on));
+  text(c,x+6,y+31,on?"On":"Off",18,false,40);
+  round(c,x+58,y+10,52,28,14,on?.36:.12,on?.66:.18,on?1.0:.26);
+  cairo_arc(c.c,x+(on?96:72),y+24,10,0,2*M_PI);cairo_set_source_rgb(c.c,.95,.97,1.0);cairo_fill(c.c);
+  buttons.push_back({x,y,116,48,"module.toggle",params});feedback(c,x,y,116,48,"module.toggle",params);
+ }
  void sidebar(Canvas&c,json_object*state){
   c.rect(0,0,222,H,0,0,0);c.rect(221,0,1,H,.08,.13,.20);
   round(c,25,34,37,39,7,.36,.66,1.0);c.text(31,63,"M",25,.015,.035,.07);text(c,76,63,"MagicShelf",25);
@@ -85,7 +91,7 @@ struct StoreUI{
    auto params=argsFor(textfield(m,"id"));buttons.push_back({x,y,484,cardH-72,"ui.detail",params});feedback(c,x,y,484,cardH-72,"ui.detail",params);
    auto*t=field(state,"transfer");bool active=boolfield(t,"active")&&textfield(t,"id")==textfield(m,"id");int footer=y+cardH-60;
    if(active){text(c,x+21,footer+23,transferLabel(t),18,false,442);progressBar(c,t,x+21,footer+36,442);}
-   else if(boolfield(m,"installed")){text(c,x+21,footer+30,"Installed",17,true,230);power(c,m,x+272,footer,191);}
+   else if(boolfield(m,"installed")){text(c,x+21,footer+30,"Installed",17,true,230);power(c,m,x+347,footer);}
    else button(c,x+21,footer,442,"View creation >","ui.detail",params);
   }
   if(!count){text(c,280,375,"Your shelf starts here.",30);wrap(c,280,420,820,"Explore Discover and subscribe to a creation you like.",22,3);}
@@ -148,14 +154,14 @@ struct StoreUI{
   text(c,738,392,boolfield(m,"adapter")?"Installed locally":boolfield(m,"subscribed")?"Installed · automatic updates":boolfield(m,"installed")?"Installed":"Ready to download",16,true,510);
   auto*t=field(state,"transfer");bool active=boolfield(t,"active")&&textfield(t,"id")==id;
   if(active){text(c,738,438,transferLabel(t),21);progressBar(c,t,738,452,510);}
-  else if(boolfield(m,"installed")){power(c,m,738,416,245);button(c,1003,416,245,"Configure creation","ui.settings");}
+  else if(boolfield(m,"installed")){power(c,m,738,416);button(c,1003,416,245,"Configure creation","ui.settings");}
   else if(boolfield(m,"subscription_available"))button(c,738,416,510,"Subscribe & download","ui.subscribe",argsFor(id),true);
   std::string note=boolfield(m,"adapter")?"Local build. Downloadable releases are still being prepared.":boolfield(m,"subscribed")?"New updates download automatically, even while Off.":"Subscribe to download this creation and receive updates.";wrap(c,738,488,508,note,16,2);
   int tx=738;for(auto t:{"about","settings","credits","links"}){std::string name=t;name[0]=toupper(name[0]);button(c,tx,541,120,name,std::string("ui.tab.")+t,"{}",false,42);if(tab==t)c.rect(tx+10,581,100,3,.36,.66,1.0);tx+=130;}
   if(tab=="about"){wrap(c,738,616,508,textfield(m,"about"),18,5);auto*links=field(m,"links");for(size_t i=0;links&&i<std::min(size_t(2),json_object_array_length(links));i++){auto*l=json_object_array_get_idx(links,i);button(c,738+int(i)*260,773,248,textfield(l,"label"),"module.link",argsFor(id,"index",json_object_new_int(i)),false,48);}}
   else if(tab=="settings"){
    if(!boolfield(m,"installed")){wrap(c,738,625,508,"Subscribe and download this creation to configure it.",20,3);return;}
-   text(c,738,621,"On your shelf",21);text(c,738,650,boolfield(m,"enabled")?"Running and ready to use.":"Off. Saved data is kept.",16,true,330);button(c,1104,604,144,boolfield(m,"enabled")?"Turn off":"Turn on","module.toggle",argsFor(id,"enabled",json_object_new_boolean(!boolfield(m,"enabled"))));
+   text(c,738,621,"On your shelf",21);text(c,738,650,boolfield(m,"enabled")?"Running and ready to use.":"Off. Saved data is kept.",16,true,508);
    if(boolfield(m,"can_configure")||boolfield(m,"adapter")){button(c,738,676,510,"Open device settings in VR","module.open",argsFor(id));if(!boolfield(m,"adapter")){if(field(m,"update"))button(c,738,738,245,"Review update","ui.update",argsFor(id));else if(boolfield(m,"subscribed"))button(c,738,738,245,"Unsubscribe","module.subscribe",argsFor(id,"subscribed",json_object_new_boolean(false)));else button(c,738,738,245,"Subscribe for updates","ui.subscribe",argsFor(id));button(c,1003,738,245,"Remove download","ui.remove",argsFor(id));}text(c,738,818,"Opening settings turns this creation on.",16,true,508);}else{int y=679;if(boolfield(m,"subscribed")){button(c,738,y,245,"Unsubscribe","module.subscribe",argsFor(id,"subscribed",json_object_new_boolean(false)));y+=58;}else if(boolfield(m,"subscription_available")){button(c,738,y,245,"Subscribe for updates","ui.subscribe",argsFor(id));y+=58;}if(field(m,"update")){button(c,738,y,245,"Review update","ui.update",argsFor(id));}button(c,1003,737,245,"Remove download","ui.remove",argsFor(id));}
   }else if(tab=="links"){
    auto*links=field(m,"links");int total=links?json_object_array_length(links):0;linkPage=std::clamp(linkPage,0,std::max(0,(total-1)/3));

@@ -35,7 +35,7 @@ is recorded in [docs/VALIDATION.md](docs/VALIDATION.md).
 
 ## Your collection
 
-The storefront is installed locally as **0.3.4** for testing. The public installer
+The storefront is installed locally as **0.3.5** for testing. The public installer
 above remains **0.1.3** until a new release is published. The VR storefront opens
 at 1.8 m wide and renders at 2560 × 1800 for sharper text. The desktop shortcut
 opens this same native dashboard. The display stays on one GPU texture while
@@ -45,7 +45,8 @@ Navigation remains available while downloads and updates run.
 
 - **Discover** shows screenshot cards; **My Shelf** shows your installed creations.
 - Installed creations have an **On / Off** control directly on their collection
-  card and at the top of their detail page.
+  card and at the top of their detail page. The compact switch shows only the
+  current state. The Android Phone gallery opens on its Android home screen.
 - Open a creation for its gallery, settings, GitHub links and artist credits.
   Support links are optional and go directly to the creator's page.
 - **Subscribe & download** installs a creation. Subscribed packages check for updates at
