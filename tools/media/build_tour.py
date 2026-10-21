@@ -116,8 +116,8 @@ def main():
         text(72,1026,'MAGICSHELF 0.3.6  /  DEVELOPMENT PREVIEW',16,MUTED)
         text(1635,1026,f'{index+1:02d} / {len(SCENES):02d}',16,MUTED)
         c.set_source_rgba(*BLUE,.18);c.rectangle(72,1050,1776,3);c.fill();c.set_source_rgb(*BLUE);c.rectangle(72,1050,1776*t/SECONDS,3);c.fill()
-        # Short fade at each cut and at the beginning/end.
-        opacity=max(0,1-(t-start)/.22,1-(end-t)/.22)
+        # Fade at cuts and the end; keep the first frame visible for video previews.
+        opacity=max(0,1-(t-start)/.22 if start>0 else 0,1-(end-t)/.22)
         if opacity>0:c.set_source_rgba(.004,.008,.015,min(opacity,1));c.paint()
     output=a.output/'magicshelf-feature-tour.mp4'
     cmd=['ffmpeg','-hide_banner','-loglevel','warning','-y','-f','rawvideo','-pixel_format','bgra','-video_size',f'{W}x{H}','-framerate',str(FPS),'-i','pipe:0','-i',str(a.output/'shelf-lights.wav'),'-c:v','libx264','-preset','fast','-crf','24','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart','-t',str(SECONDS),str(output)]
