@@ -3,14 +3,14 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MagicShelf</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
 <body>
 <aside class="sidebar">
-  <a class="brand" href="#" id="brand"><span class="brand-mark" aria-hidden="true">M</span><span>MagicShelf<small>by josethevrtech</small></span></a>
-  <nav aria-label="Main navigation"><button id="discover" class="nav-item" aria-pressed="true"><span aria-hidden="true">◈</span> Discover</button><button id="library" class="nav-item" aria-pressed="false"><span aria-hidden="true">▤</span> My Shelf <span id="shelf-count" class="count">0</span></button></nav>
-  <div class="sidebar-bottom"><div class="free-note"><span class="spark">✦</span><strong>A little magic. Always free.</strong><p>Subscribe to your favorites.<br>We’ll keep them up to date.</p></div><button id="refresh" class="quiet">↻ Check for updates</button><button id="preferences" class="quiet">Store settings</button><small id="version"></small></div>
+  <a class="brand" href="#" id="brand"><span class="brand-mark" aria-hidden="true">M</span><span>MagicShelf</span></a>
+  <nav aria-label="Main navigation"><button id="discover" class="nav-item" aria-pressed="true"><span aria-hidden="true">◈</span> Discover</button><button id="library" class="nav-item" aria-pressed="false"><span aria-hidden="true">▤</span> My Shelf <span id="shelf-count" class="count">0</span></button><button id="preferences" class="nav-item" aria-pressed="false">Settings</button></nav>
+  <div class="sidebar-bottom"><button id="refresh" class="quiet">Check for updates</button><small id="version"></small></div>
 </aside>
 <main id="main">
-  <header class="topbar"><span id="breadcrumb">The creation collection</span><button id="home" class="secondary">Return creations home <span aria-hidden="true">↗</span></button></header>
+  <header class="topbar"><span id="breadcrumb"></span><button id="home" class="secondary">Return creations home <span aria-hidden="true">↗</span></button></header>
   <div id="content"></div>
   <div class="notice-wrap"><p id="notice" role="status" aria-live="polite">Connecting to your shelf…</p><p id="update-status"></p></div>
 </main>
-<dialog id="review" aria-labelledby="review-title"><form method="dialog"><span class="eyebrow">FREE · NO PAYMENT REQUIRED</span><h2 id="review-title"></h2><p id="review-description"></p><p id="review-permissions" class="permission-note"></p><p id="review-note"></p><div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button id="confirm" value="confirm" class="primary">Subscribe & download</button></div></form></dialog>
+<dialog id="review" aria-labelledby="review-title"><form method="dialog"><h2 id="review-title"></h2><p id="review-description"></p><p id="review-permissions" class="permission-note"></p><p id="review-note"></p><div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button id="confirm" value="confirm" class="primary">Subscribe & download</button></div></form></dialog>
 </body></html>

@@ -279,3 +279,36 @@ Per-creation runtime data, caches and externally supplied inputs are separate
 from immutable package directories. Android's opaque user-namespace files are
 outside ordinary framework data snapshots; see the API 2 rollback limitations
 in [CREATING.md](CREATING.md).
+
+## Collection cleanup and app settings 0.3.3 — October 21, 2026
+
+The native app now uses a black background and blue accents. Discover has a
+single **Explore the Collection** heading; pricing badges and promotional free
+copy are removed. The main title is **MagicShelf**, with developer and project
+credits moved to Settings. The diagnostic browser UI follows the same wording.
+
+Settings exposes bounded dock size, spacing, opacity, visibility, position,
+angle and lean controls, plus dashboard width and starting view. Changes persist
+in the existing layout file without modifying the module API or requiring new
+creation builds. Geometry changes and shelf/placement resets return active
+creations home; app preferences and opacity changes do not reposition them.
+
+- All 64 Python tests pass locally and on the Frame, including persistence,
+  atomic rejection of invalid settings, scoped resets and credit link validation.
+- Native control checks pass on both architectures. The new settings pages have
+  non-overlapping hit targets and valid action payloads. Settings previews and
+  a live Discover capture were inspected at 2560 × 1800.
+- The persistent texture test passes on the Frame, including full and partial
+  upload colors, orientation and 100 updates. Live rendering still reports one
+  application texture allocation.
+- The verified ARM bundle installed successfully as 0.3.3. Live RPC checks
+  changed settings, restarted the manager, verified persistence, exercised all
+  three reset groups and restored the previous preferences. The original dock
+  objects and anchor were preserved. OpenVR reports the restored 1.8 m app width
+  and 1280 × 900 logical input coordinates.
+- SteamVR retained PID 2571. Both MagicShelf services are active with zero
+  automatic restarts. The creations were uninstalled at the start of this work
+  and remain uninstalled; this update did not alter their installation choices.
+
+Controller feedback on these new controls is pending the user's headset check.
+This is a local installation; the public framework installer remains 0.1.3.

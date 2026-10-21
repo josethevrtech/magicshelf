@@ -13,6 +13,7 @@ from . import VERSION
 from .contracts import ContractError, MAX_MODULES, catalog, load, machine, require, version
 from .packages import download, unpack
 from .storefront import cache_images, decorate
+from . import preferences
 
 OFFICIAL = "https://raw.githubusercontent.com/josethevrtech/magicshelf/main/catalog.json"
 ADAPTERS = {
@@ -351,7 +352,7 @@ class Manager:
                     self.install_item(key, permissions)
                 self.state["subscriptions"][key] = {"catalog_url": item["catalog_url"], "permissions": list(permissions)}
                 self.save()
-                self.message = "Subscribed. Downloads and future updates are free and automatic."
+                self.message = "Subscribed. Future updates download automatically."
         return self.snapshot()
 
     def sync_subscriptions(self, refresh=True):
@@ -540,6 +541,36 @@ class Manager:
         self.message = "Returned creations home"
         return self.snapshot()
 
+    def update_settings(self, changes):
+        changes = preferences.validate(changes)
+        with self.transaction():
+            data = load(self.layoutpath)
+            reposition = any(key in preferences.PLACEMENT_KEYS and data.get(key) != value for key, value in changes.items())
+            data.update(changes)
+            atomic(self.layoutpath, data)
+            if reposition:
+                self.home_all()
+            self.message = "Settings saved." + (" Creations returned to the dock." if reposition else "")
+        return self.snapshot()
+
+    def reset_settings(self, group):
+        require(group in ("shelf", "placement", "app"), "Unknown settings section")
+        defaults = preferences.defaults()
+        with self.transaction():
+            data = load(self.layoutpath)
+            data.update({c["key"]: defaults[c["key"]] for c in preferences.CONTROLS if c["group"] == group})
+            atomic(self.layoutpath, data)
+            if group != "app":
+                self.home_all()
+            self.message = "Default settings restored." + (" Creations returned to the dock." if group != "app" else "")
+        return self.snapshot()
+
+    def app_link(self, index):
+        require(type(index) is int and 0 <= index < len(preferences.CREDITS), "Unknown app credit")
+        subprocess.run(["xdg-open", preferences.CREDITS[index]["url"]], check=True, timeout=10, capture_output=True)
+        self.message = "Link opened in your browser."
+        return self.snapshot()
+
     def snapshot(self):
         modules = []
         for key, state in list(self.state["modules"].items()):
@@ -561,7 +592,7 @@ class Manager:
             item["subscribed"] = bool(sub)
             item["subscription_available"] = not self.is_adapter(item["id"]) and any(i["id"] == item["id"] for i in self.state["catalog"])
             item["update_mode"] = "local" if self.is_adapter(item["id"]) else "automatic" if sub else "manual"
-        return {"api_version": 1, "version": VERSION, "modules": modules, "catalogs": self.state["catalogs"], "busy": self.busy, "message": self.message, "update_message": self.update_message}
+        return {"api_version": 1, "version": VERSION, "modules": modules, "catalogs": self.state["catalogs"], "preferences": preferences.snapshot(load(self.layoutpath)), "busy": self.busy, "message": self.message, "update_message": self.update_message}
 
     def publish(self):
         atomic(self.runtime / "ui-state.json", self.snapshot())

@@ -81,7 +81,7 @@ class StorefrontTests(unittest.TestCase):
         for key in BUILTINS:
             self.manager.state['modules'][key]={'adapter':True,'version':'0.1.0','enabled':False}
         for item in self.manager.snapshot()['modules']:
-            self.assertFalse(item['subscription_available']);self.assertEqual(item['update_mode'],'local');self.assertEqual(item['price_label'],'Free')
+            self.assertFalse(item['subscription_available']);self.assertEqual(item['update_mode'],'local');self.assertNotIn('price_label',item)
             self.assertGreaterEqual(len(item['screenshots']),2)
             for image in item['screenshots']:
                 path=media_path(image['url'],self.manager.root);valid_png(path)

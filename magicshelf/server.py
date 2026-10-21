@@ -37,6 +37,9 @@ def dispatch(manager, packet):
         "catalog.refresh": lambda: manager.refresh_and_sync(),
         "subscriptions.sync": lambda: manager.sync_subscriptions(),
         "home": lambda: manager.home_all(),
+        "settings.update": lambda: manager.update_settings(p.get("changes")),
+        "settings.reset": lambda: manager.reset_settings(p.get("group")),
+        "app.link": lambda: manager.app_link(p.get("index")),
     }
     if method not in actions:
         raise ValueError("Unknown MagicShelf method")

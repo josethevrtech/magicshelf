@@ -9,7 +9,17 @@ ui.selected="org.test.phone";for(auto t:{"about","settings","credits","links"}){
 ui.selected.clear();auto*list=field(state,"modules");for(int i=0;i<9;i++){auto*m=json_tokener_parse(R"({"name":"A very long creation name to check clipping","description":"Long descriptions remain inside their own creation card and never cover another card's controls.","category":"Creations","installed":true})");json_object_object_add(m,"id",json_object_new_string(("org.test.extra"+std::to_string(i)).c_str()));json_object_array_add(list,m);}for(auto v:{"discover","library"}){ui.view=v;for(int page=0;page<4;page++){ui.page=page;check(ui,c,state);}}
 // Trigger presses commit on release over the same target. Page navigation stays
 // available while manager actions are pending; a changed target never fires.
-ui.selected="org.test.phone";ui.tab="settings";check(ui,c,state);StoreInput input;
+// App settings use the same navigation and hit-target contract as creations.
+auto*prefs=json_tokener_parse(R"({"values":{"opacity":0.72,"launcher_only":true},"controls":[{"key":"opacity","group":"shelf","label":"Shelf opacity","description":"Transparency","min":0.2,"max":1.0,"step":0.1,"unit":"%"},{"key":"launcher_only","group":"shelf","label":"Show shelf","description":"Where","choices":[{"label":"Steam home","value":true},{"label":"Every page","value":false}]}],"credits":[{"name":"josethevrtech","role":"Creator"}]})");
+json_object_object_add(state,"preferences",prefs);
+assert(!ui.local({0,0,0,0,"ui.preferences","{}"},state,method,params));assert(ui.view=="settings"&&ui.selected.empty());
+for(auto group:{"shelf","placement","app","credits"}){ui.settingsTab=group;check(ui,c,state);}
+ui.settingsTab="shelf";check(ui,c,state);bool changed=false;
+for(auto b:ui.buttons)if(b.method=="settings.update"){
+ assert(ui.local(b,state,method,params));assert(method=="settings.update");auto*p=json_tokener_parse(params.c_str());assert(field(p,"changes"));json_object_put(p);changed=true;
+}
+assert(changed);
+ui.view="discover";ui.selected="org.test.phone";ui.tab="settings";check(ui,c,state);StoreInput input;
 auto findButton=[&](const std::string&method){for(auto b:ui.buttons)if(b.method==method)return b;assert(false);return StoreButton{};};
 auto toggle=findButton("module.toggle"),nav=findButton("ui.tab.credits");
 auto px=[](const StoreButton&b){return b.x+b.w/2.f;};auto py=[](const StoreButton&b){return b.y+b.h/2.f;};

@@ -64,7 +64,6 @@ def cache_images(items, root):
 def decorate(meta, root):
     builtin = BUILTINS.get(meta['id'], {}) if meta.get('adapter') else {}
     value = {**meta, **builtin}
-    value['price_label'] = 'Free'
     value.setdefault('category', 'Creations')
     value.setdefault('about', value['description'])
     value.setdefault('links', [])

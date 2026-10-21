@@ -39,7 +39,7 @@ void dashboard(){
  ObjectDock shelf(o,config);Canvas canvas(StoreUI::W*RenderScale,StoreUI::H*RenderScale);cairo_scale(canvas.c,RenderScale,RenderScale);
  // The GPU uploader converts only dirty regions. Canvas's full RGBA copy is unused.
  canvas.rgba.clear();canvas.rgba.shrink_to_fit();
- StoreUI ui;StoreInput input;
+ StoreUI ui;StoreInput input;bool initialView=false;float appliedWidth=DashboardWidthMeters;
  std::string data,previous,previousHover,previousPressed,actionError;
  std::mutex stateMutex;ActionWorker worker;
  auto action=[&](const std::string&method,const std::string&params){
@@ -60,7 +60,13 @@ void dashboard(){
   auto now=Clock::now();
   if(now>=dockTick){vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount];vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseStanding,.01f,poses,vr::k_unMaxTrackedDeviceCount);shelf.refresh();shelf.show(poses[0].bPoseIsValid);dockTick=now+std::chrono::milliseconds(50);}
   if(now>=poll){std::ifstream f(dir+"/ui-state.json");std::string next((std::istreambuf_iterator<char>(f)),{});if(next!=data){auto*j=json_tokener_parse(next.c_str());if(j){state.reset(j);data=next;}}poll=now+std::chrono::milliseconds(100);}
-  auto*j=state.get();bool working=busy||boolfield(j,"busy");
+  auto*j=state.get();auto*prefs=field(field(j,"preferences"),"values");
+  if(prefs){
+   if(!initialView){ui.view=textfield(prefs,"start_view")=="library"?"library":"discover";initialView=true;}
+   float width=json_object_get_double(field(prefs,"dashboard_width_m"));
+   if(std::isfinite(width)&&width>=1.2f&&width<=2.4f&&fabsf(width-appliedWidth)>.001f){o->SetOverlayWidthInMeters(panel,width);appliedWidth=width;}
+  }
+  bool working=busy||boolfield(j,"busy");
   vr::VREvent_t event;
   while(vr::VRSystem()->PollNextEvent(&event,sizeof(event)))if(event.eventType==vr::VREvent_Quit){vr::VRSystem()->AcknowledgeQuit_Exiting();running=false;}
   while(o->PollNextOverlayEvent(panel,&event,sizeof(event))){
@@ -105,8 +111,8 @@ void dashboard(){
 }
 
 int main(int argc,char**argv){try{
- if(argc==3&&std::string(argv[1])=="--icon"){Canvas icon(128,128);icon.fill(.045,.064,.091);icon.rect(23,37,82,65,.58,.79,.72);icon.rect(30,44,68,51,.045,.064,.091);icon.rect(18,27,92,10,.76,.91,.85);icon.text(35,82,"M",39);icon.png(argv[2]);return 0;}
- if(argc>=4&&std::string(argv[1])=="--preview"){auto*j=json_object_from_file(argv[2]);if(!j)throw std::runtime_error("Cannot read preview state");Canvas c(StoreUI::W*RenderScale,StoreUI::H*RenderScale);cairo_scale(c.c,RenderScale,RenderScale);StoreUI ui;if(argc>4)ui.selected=argv[4];if(argc>5)ui.tab=argv[5];ui.draw(c,j,false,"MagicShelf · Every creation is free.");c.png(argv[3]);json_object_put(j);return 0;}
+ if(argc==3&&std::string(argv[1])=="--icon"){Canvas icon(128,128);icon.fill(0,0,0);icon.rect(23,37,82,65,.36,.66,1.0);icon.rect(30,44,68,51,0,0,0);icon.rect(18,27,92,10,.36,.66,1.0);icon.text(35,82,"M",39);icon.png(argv[2]);return 0;}
+ if(argc>=4&&std::string(argv[1])=="--preview"){auto*j=json_object_from_file(argv[2]);if(!j)throw std::runtime_error("Cannot read preview state");Canvas c(StoreUI::W*RenderScale,StoreUI::H*RenderScale);cairo_scale(c.c,RenderScale,RenderScale);StoreUI ui;if(argc>4)ui.selected=argv[4];if(argc>5)ui.tab=argv[5];ui.draw(c,j,false,"Ready");c.png(argv[3]);json_object_put(j);return 0;}
  std::signal(SIGTERM,stop);std::signal(SIGINT,stop);std::signal(SIGPIPE,SIG_IGN);
  bool command=argc==2;vr::EVRInitError error;vr::VR_Init(&error,command?vr::VRApplication_Background:vr::VRApplication_Overlay);
  if(error)throw std::runtime_error(vr::VR_GetVRInitErrorAsEnglishDescription(error));
