@@ -7,7 +7,7 @@ once, follow a collection, then choose which toys belong on your shelf.
 
 ## Install
 
-In Desktop Mode, download [Install MagicShelf.desktop](https://github.com/josethevrtech/magicshelf/releases/download/v0.1.2/Install%20MagicShelf.desktop)
+In Desktop Mode, download [Install.MagicShelf.desktop](https://github.com/josethevrtech/magicshelf/releases/download/v0.1.2/Install.MagicShelf.desktop)
 to your desktop and double-click it. If your desktop asks whether to execute or
 trust the downloaded launcher, allow it. Open the new **MagicShelf** shortcut or
 select **MagicShelf** in SteamVR's dashboard.

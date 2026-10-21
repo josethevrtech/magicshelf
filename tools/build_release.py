@@ -57,10 +57,10 @@ except Exception as error:
     # Base64 is just argument quoting for Desktop Entry's Exec grammar.
     code="import base64;exec(base64.b64decode('"+base64.b64encode(launcher_source.encode()).decode()+"'))"
     escaped=code.replace('\\','\\\\').replace('"','\\"').replace('%','%%')
-    (out/'Install MagicShelf.desktop').write_text('[Desktop Entry]\nType=Application\nName=Install MagicShelf\nComment=Install the MagicShelf shelf and module library\nExec=python3 -c "'+escaped+'"\nIcon=applications-games\nTerminal=true\nCategories=Game;\n')
-    (out/'Install MagicShelf.desktop').chmod(0o755)
-    assets=[out/'example-catalog.json',module,archive,out/'catalog.json',bootstrap,out/'Install MagicShelf.desktop']
+    (out/'Install.MagicShelf.desktop').write_text('[Desktop Entry]\nType=Application\nName=Install MagicShelf\nComment=Install the MagicShelf shelf and module library\nExec=python3 -c "'+escaped+'"\nIcon=applications-games\nTerminal=true\nCategories=Game;\n')
+    (out/'Install.MagicShelf.desktop').chmod(0o755)
+    assets=[out/'example-catalog.json',module,archive,out/'catalog.json',bootstrap,out/'Install.MagicShelf.desktop']
     (out/'SHA256SUMS').write_text(''.join(sha(p)+'  '+p.name+'\n' for p in sorted(assets)))
-    print(json.dumps({'version':VERSION,'architecture':arch,'framework':str(archive),'module':str(module),'desktop':str(out/'Install MagicShelf.desktop')},indent=2))
+    print(json.dumps({'version':VERSION,'architecture':arch,'framework':str(archive),'module':str(module),'desktop':str(out/'Install.MagicShelf.desktop')},indent=2))
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--architecture',choices=['aarch64','x86_64'],required=True);build(parser.parse_args().architecture)

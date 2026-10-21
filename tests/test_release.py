@@ -36,7 +36,7 @@ class ReleaseTests(unittest.TestCase):
             for name,digest in release['files'].items():self.assertEqual(hashlib.sha256(tar.extractfile('magicshelf/'+name).read()).hexdigest(),digest)
             self.assertEqual(release['bundled'],[])
     def test_desktop_launcher_pins_bootstrap_without_assert(self):
-        desktop=(self.root/'dist/Install MagicShelf.desktop').read_text()
+        desktop=(self.root/'dist/Install.MagicShelf.desktop').read_text()
         encoded=re.search("b64decode\\('([^']+)'\\)",desktop)[1]
         source=base64.b64decode(encoded).decode()
         ast.parse(source)

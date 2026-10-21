@@ -6,7 +6,7 @@
 2. Run the unit tests and compile on each advertised architecture. Test the
    actual installer, VR library, on/off controls, a new module, and a failed update.
 3. `bash build.sh` writes verified framework and module archives, `catalog.json`,
-   `install-magicshelf.py`, `Install MagicShelf.desktop`, and `SHA256SUMS` into `dist/`.
+   `install-magicshelf.py`, `Install.MagicShelf.desktop`, and `SHA256SUMS` into `dist/`.
 4. Commit the generated catalog to the repository. Create a release using the
    matching `vVERSION` tag and attach all the generated assets. A draft release
    keeps the download links unavailable until the complete set is ready.
