@@ -6,6 +6,22 @@ Built for **SteamOS and Steam Frame only**. Browse the native SteamVR collection
 screenshots and settings, and find its project links and artist credits.
 Subscriptions download published creations and keep them up to date.
 
+## See MagicShelf
+
+A look at the **0.3.6 development build** on Steam Frame. The public installer below is still **0.1.3**.
+
+[![Watch the MagicShelf feature tour](https://github.com/user-attachments/assets/dd44f9fe-1504-4130-92c3-9fde3a417a05)](https://github.com/user-attachments/assets/03aae0ae-83f4-459f-b648-a20a2ad3416f)
+
+**[Watch the 48-second feature tour with music](https://github.com/user-attachments/assets/03aae0ae-83f4-459f-b648-a20a2ad3416f)** — explore creations, card On/Off controls, artist credits, permission reviews, automatic downloads and shelf customization.
+
+| Discover | Creation details |
+| --- | --- |
+| ![Discover on Steam Frame](https://github.com/user-attachments/assets/b4ccd554-1e5b-45ff-ba4d-64f458f648a0) | ![Android Phone (Virtual)](https://github.com/user-attachments/assets/33bc835e-c0ba-4341-9958-5cf267bd5446) |
+| **Artist credits** | **Shelf settings** |
+| ![Smartphone Digivice artist credits](https://github.com/user-attachments/assets/e0a8cbb0-e3cc-43d0-b6bf-f9601ec10187) | ![Shelf customization controls](https://github.com/user-attachments/assets/94353032-21fa-4667-8835-db186a7d807f) |
+
+The tour uses the native app renderer with current creation metadata. Install and download scenes are illustrative. Music: **Shelf Lights**, composed and synthesized for this tour without external samples. Digivice model: [Jojogape](https://x.com/jojogape); Digital Partner game: [Aludeku](https://aludeku.itch.io/digital-partner-digimon).
+
 ## Framework and creations
 
 Each creation has its own source repository and release cycle:
