@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from magicshelf.contracts import ContractError, manifest
+from magicshelf.contracts import ContractError, manifest, PERMISSIONS
 from magicshelf.manager import Manager
 from magicshelf.server import dispatch
 from magicshelf.storefront import MEDIA, BUILTINS, decorate, media_path, valid_png
@@ -27,7 +27,10 @@ class StorefrontTests(unittest.TestCase):
         self.archives[item['url']]=archive
         self.manager.state['catalog']=[item]
         return item
-    def download(self,url,target,limit):shutil.copy2(self.archives[url],target)
+    def download(self,url,target,limit,progress=None):
+        if progress:progress(0)
+        shutil.copy2(self.archives[url],target)
+        if progress:progress(target.stat().st_size)
     def subscribe(self):
         with patch('magicshelf.manager.download',side_effect=self.download):
             return self.manager.subscribe(self.key,True,['vr-overlay'])
@@ -38,6 +41,48 @@ class StorefrontTests(unittest.TestCase):
         restored=Manager(self.path/'home',self.path/'runtime',FakeSystem())
         self.assertEqual(restored.state['subscriptions'][self.key]['catalog_url'],self.source)
         self.assertTrue(restored.modulepath(self.key,'1.0.0').is_dir())
+    def test_download_progress_is_published_before_automatic_install(self):
+        item=self.release('1.0.0');observed=[]
+        publish=self.manager.publish
+        def record():
+            publish()
+            state=json.loads((self.manager.runtime/'ui-state.json').read_text())
+            if state['transfer']:observed.append(state)
+        def downloading(url,target,limit,progress):
+            progress(0)
+            self.assertEqual(json.loads((self.manager.runtime/'ui-state.json').read_text())['transfer']['stage'],'downloading')
+            shutil.copy2(self.archives[url],target)
+            progress(target.stat().st_size)
+        with patch.object(self.manager,'publish',side_effect=record),patch('magicshelf.manager.download',side_effect=downloading):
+            result=self.manager.subscribe(self.key,True,item['permissions'])
+        stages=[s['transfer']['stage'] for s in observed]
+        self.assertLess(stages.index('downloading'),stages.index('checking'))
+        self.assertLess(stages.index('checking'),stages.index('installing'))
+        self.assertLess(stages.index('installing'),stages.index('complete'))
+        for state in observed:
+            if state['transfer']['stage']=='complete':
+                self.assertTrue(next(m for m in state['modules'] if m['id']==self.key)['installed'])
+        self.assertEqual(result['transfer']['received_bytes'],item['size_bytes'])
+        self.assertFalse(result['transfer']['active']);self.assertFalse(result['busy'])
+        self.assertTrue(result['modules'][0]['installed'])
+    def test_bad_download_never_reports_ready_and_preserves_previous_install(self):
+        self.release('1.0.0');self.subscribe()
+        item=self.release('1.1.0');item['sha256']='0'*64
+        with patch('magicshelf.manager.download',side_effect=self.download),self.assertRaisesRegex(ContractError,'checksum'):
+            self.manager.subscribe(self.key,True,item['permissions'])
+        state=self.manager.snapshot()
+        self.assertEqual(state['transfer']['stage'],'failed');self.assertFalse(state['transfer']['active'])
+        self.assertEqual(self.manager.state['modules'][self.key]['version'],'1.0.0')
+        self.assertFalse(self.manager.modulepath(self.key,'1.1.0').exists())
+    def test_permissions_have_plain_language_for_installs_and_updates(self):
+        item=meta();item['permissions']=sorted(PERMISSIONS)
+        result=decorate({**item,'update':item},self.manager.root)
+        for value in (result,result['update']):
+            self.assertEqual([p['id'] for p in value['permission_details']],sorted(PERMISSIONS))
+            for permission in value['permission_details']:
+                self.assertNotEqual(permission['title'],permission['id'])
+                self.assertGreater(len(permission['description']),30)
+            self.assertEqual(value['permissions'],sorted(PERMISSIONS))
     def test_automatic_update_keeps_off_and_saved_data(self):
         self.release('1.0.0');self.subscribe()
         data=self.manager.root/'module-data'/self.key;data.mkdir(parents=True);(data/'save').write_text('my pet')
@@ -75,6 +120,7 @@ class StorefrontTests(unittest.TestCase):
         with self.assertRaises(ContractError):self.manager.subscribe(self.key,True,['vr-overlay'])
     def test_removal_cancels_auto_redownload(self):
         self.release('1.0.0');self.subscribe();self.manager.remove(self.key)
+        self.assertIsNone(self.manager.snapshot()['transfer'])
         with patch('magicshelf.manager.download') as download:self.manager.sync_subscriptions(refresh=False)
         download.assert_not_called();self.assertNotIn(self.key,self.manager.state['subscriptions'])
     def test_local_builds_have_real_gallery_and_no_fake_download(self):

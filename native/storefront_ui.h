@@ -41,12 +41,25 @@ struct StoreUI{
  void wrap(Canvas&c,int x,int y,int width,const std::string&s,int size,int lines=4,bool muted=true){std::istringstream words(s);std::string word,line;int n=0;cairo_set_font_size(c.c,size);while(words>>word){auto next=line.empty()?word:line+" "+word;cairo_text_extents_t e{};cairo_text_extents(c.c,next.c_str(),&e);if(e.x_advance>width&&!line.empty()){text(c,x,y+n*(size+9),line,size,muted,width);line=word;if(++n>=lines)return;}else line=next;}if(!line.empty()&&n<lines)text(c,x,y+n*(size+9),line,size,muted,width);}
  void button(Canvas&c,int x,int y,int w,const std::string&label,const std::string&method,const std::string&params="{}",bool primary=false,int h=48){round(c,x,y,w,h,9,primary?.36:.035,primary?.66:.065,primary?1.0:.11);if(primary){cairo_save(c.c);cairo_rectangle(c.c,x+14,y+8,w-28,h-10);cairo_clip(c.c);c.text(x+16,y+h/2+7,label,19,.015,.035,.07);cairo_restore(c.c);}else text(c,x+16,y+h/2+7,label,19,false,w-28);buttons.push_back({x,y,w,h,method,params});feedback(c,x,y,w,h,method,params);}
  void art(Canvas&c,json_object*m,int x,int y,int w,int h,int index=0){round(c,x,y,w,h,14,.018,.032,.055);auto*pics=field(m,"screenshots");int n=pics?json_object_array_length(pics):0;if(!n){text(c,x+w/2-20,y+h/2+18,"M",56);return;}auto*p=json_object_array_get_idx(pics,index%n);auto path=textfield(p,"path");auto*s=image(path);if(cairo_surface_status(s)==CAIRO_STATUS_SUCCESS){int iw=cairo_image_surface_get_width(s),ih=cairo_image_surface_get_height(s);double scale=std::min(double(w)/iw,double(h-12)/ih);cairo_save(c.c);cairo_translate(c.c,x+(w-iw*scale)/2,y+(h-ih*scale)/2);cairo_scale(c.c,scale,scale);cairo_set_source_surface(c.c,s,0,0);cairo_paint(c.c);cairo_restore(c.c);}else text(c,x+30,y+70,"Preview unavailable",20,true,w-60);}
+ std::string transferLabel(json_object*t){auto stage=textfield(t,"stage");return stage=="downloading"?"Downloading":stage=="checking"?"Checking download":stage=="installing"?"Installing":stage=="complete"?"Installed · Ready":"Download failed";}
+ double fraction(json_object*t){double total=json_object_get_double(field(t,"total_bytes"));return total>0?std::clamp(json_object_get_double(field(t,"received_bytes"))/total,0.,1.):0.;}
+ void progressBar(Canvas&c,json_object*t,int x,int y,int width){
+  round(c,x,y,width,7,3,.06,.12,.20);double fill=width*fraction(t);if(fill>0)c.rect(x,y,std::max(1,int(fill)),7,.36,.66,1.0);
+ }
+ void power(Canvas&c,json_object*m,int x,int y,int width=144){bool on=boolfield(m,"enabled");button(c,x,y,width,on?"On  |  Turn off":"Off  |  Turn on","module.toggle",argsFor(textfield(m,"id"),"enabled",json_object_new_boolean(!on)),on);}
  void sidebar(Canvas&c,json_object*state){
   c.rect(0,0,222,H,0,0,0);c.rect(221,0,1,H,.08,.13,.20);
   round(c,25,34,37,39,7,.36,.66,1.0);c.text(31,63,"M",25,.015,.035,.07);text(c,76,63,"MagicShelf",25);
   button(c,20,141,180,"Discover","ui.discover","{}",view=="discover");
   button(c,20,199,180,"My Shelf","ui.library","{}",view=="library");
   button(c,20,257,180,"Settings","ui.preferences","{}",view=="settings");
+  if(auto*t=field(state,"transfer")){
+   text(c,27,587,"DOWNLOADS",13,true,170);wrap(c,27,618,168,textfield(t,"name"),18,2,false);
+   wrap(c,27,684,174,transferLabel(t),16,2);progressBar(c,t,27,723,168);
+   if(textfield(t,"stage")=="downloading"){
+    char amount[70];snprintf(amount,sizeof(amount),"%.1f / %.1f MB · %.0f%%",json_object_get_double(field(t,"received_bytes"))/1048576.,json_object_get_double(field(t,"total_bytes"))/1048576.,std::floor(fraction(t)*100));text(c,27,753,amount,12,true,172);
+   }
+  }
   button(c,20,779,182,"Check updates","catalog.refresh");text(c,27,861,"MagicShelf "+textfield(state,"version"),13,true,175);
  }
  void draw(Canvas&c,json_object*state,bool busy,const std::string&message){
@@ -54,22 +67,26 @@ struct StoreUI{
   auto*m=find(state,selected);if(!selected.empty()&&!m)selected.clear();
   if(m)text(c,254,55,"Collection / "+textfield(m,"name"),17,true,670);
   button(c,1010,25,238,"Return creations home","home");c.rect(254,94,994,1,.08,.13,.20);
-  if(!reviewId.empty())review(c,state);else if(m)detail(c,m);else if(view=="settings")preferences(c,state);else collection(c,state);
-  c.rect(254,848,994,1,.08,.13,.20);text(c,254,869,busy?"Saving changes... You can keep browsing.":message,14,true,994);text(c,254,891,textfield(state,"update_message"),12,true,994);
+  if(!reviewId.empty())review(c,state);else if(m)detail(c,m,state);else if(view=="settings")preferences(c,state);else collection(c,state);
+  auto*t=field(state,"transfer");std::string status=boolfield(t,"active")?transferLabel(t)+" · "+textfield(t,"name"):busy?"Updating your shelf... You can keep browsing.":message;
+  c.rect(254,848,994,1,.08,.13,.20);text(c,254,869,status,14,true,994);text(c,254,891,textfield(state,"update_message"),12,true,994);
  }
  void collection(Canvas&c,json_object*state){
   text(c,254,171,view=="discover"?"Explore the Collection":"My Shelf",38);
   std::vector<json_object*>items;auto*list=field(state,"modules");
   for(size_t i=0;list&&i<json_object_array_length(list);i++){auto*m=json_object_array_get_idx(list,i);if(view=="discover"||boolfield(m,"installed")||boolfield(m,"subscribed"))items.push_back(m);}
   page=std::clamp(page,0,std::max(0,(int(items.size())-1)/4));text(c,1102,171,std::to_string(items.size())+" creations",16,true,145);
-  int count=std::min(4,int(items.size())-page*4);bool big=count<=2;int cardH=big?548:270,artH=big?368:150;
+  int count=std::min(4,int(items.size())-page*4);bool big=count<=2;int cardH=big?548:270,artH=big?340:124;
   for(int n=0;n<count;n++){
    auto*m=items[page*4+n];int x=254+(n%2)*510,y=220+(n/2)*288;
    round(c,x,y,484,cardH,14,.025,.04,.065);art(c,m,x,y,484,artH);
    text(c,x+21,y+artH+29,textfield(m,"category"),13,true,445);text(c,x+21,y+artH+61,textfield(m,"name"),25,false,445);
-   if(big){wrap(c,x+21,y+artH+92,442,textfield(m,"description"),17,2);text(c,x+21,y+cardH-20,boolfield(m,"installed")?(boolfield(m,"enabled")?"On your shelf":"Installed · Off"):"Available to download",15,true);text(c,x+337,y+cardH-20,"View creation >",16,false,130);}
-   else text(c,x+21,y+cardH-17,boolfield(m,"installed")?"Installed   ·   View creation >":"View creation >",15,true,442);
-   auto params=argsFor(textfield(m,"id"));buttons.push_back({x,y,484,cardH,"ui.detail",params});feedback(c,x,y,484,cardH,"ui.detail",params);
+   if(big)wrap(c,x+21,y+artH+92,442,textfield(m,"description"),17,2);
+   auto params=argsFor(textfield(m,"id"));buttons.push_back({x,y,484,cardH-72,"ui.detail",params});feedback(c,x,y,484,cardH-72,"ui.detail",params);
+   auto*t=field(state,"transfer");bool active=boolfield(t,"active")&&textfield(t,"id")==textfield(m,"id");int footer=y+cardH-60;
+   if(active){text(c,x+21,footer+23,transferLabel(t),18,false,442);progressBar(c,t,x+21,footer+36,442);}
+   else if(boolfield(m,"installed")){text(c,x+21,footer+30,"Installed",17,true,230);power(c,m,x+272,footer,191);}
+   else button(c,x+21,footer,442,"View creation >","ui.detail",params);
   }
   if(!count){text(c,280,375,"Your shelf starts here.",30);wrap(c,280,420,820,"Explore Discover and subscribe to a creation you like.",22,3);}
   if(page>0)button(c,254,792,150,"< Previous","ui.prev");if((page+1)*4<int(items.size()))button(c,1098,792,150,"Next >","ui.next");
@@ -125,19 +142,21 @@ struct StoreUI{
   button(c,254,782,238,"Restore defaults","settings.reset",std::string("{\"group\":\"")+settingsTab+"\"}");
   text(c,518,812,settingsTab=="app"?"Changes save automatically.":"Layout changes return creations to the dock.",17,true,730);
  }
- void detail(Canvas&c,json_object*m){auto id=textfield(m,"id");button(c,254,112,163,"< Collection","ui.back");
+ void detail(Canvas&c,json_object*m,json_object*state){auto id=textfield(m,"id");button(c,254,112,163,"< Collection","ui.back");
   art(c,m,254,183,450,534,gallery);auto*pics=field(m,"screenshots");int n=pics?json_object_array_length(pics):0;if(n){auto*p=json_object_array_get_idx(pics,gallery%n);wrap(c,266,749,428,textfield(p,"caption"),16,2);if(n>1){button(c,254,790,150,"< Previous","ui.photo-prev");button(c,554,790,150,"Next >","ui.photo-next");text(c,452,820,std::to_string(gallery%n+1)+" / "+std::to_string(n),17,true);}}
   text(c,738,200,textfield(m,"category"),14,true,510);text(c,738,247,textfield(m,"name"),37,false,510);text(c,738,277,"by "+textfield(m,"author"),17,true,510);wrap(c,738,316,504,textfield(m,"tagline").empty()?textfield(m,"description"):textfield(m,"tagline"),21,2,false);
-  text(c,738,392,boolfield(m,"adapter")?"Installed locally":boolfield(m,"subscribed")?"Subscribed · automatic updates":boolfield(m,"installed")?"Downloaded":"Ready to download",16,true,510);
-  if(boolfield(m,"subscription_available")&&!boolfield(m,"subscribed"))button(c,738,416,510,boolfield(m,"installed")?"Subscribe for automatic updates":"Subscribe & download","ui.subscribe",argsFor(id),true);
-  else if(boolfield(m,"installed"))button(c,738,416,510,"Configure creation","ui.settings","{}",true);
+  text(c,738,392,boolfield(m,"adapter")?"Installed locally":boolfield(m,"subscribed")?"Installed · automatic updates":boolfield(m,"installed")?"Installed":"Ready to download",16,true,510);
+  auto*t=field(state,"transfer");bool active=boolfield(t,"active")&&textfield(t,"id")==id;
+  if(active){text(c,738,438,transferLabel(t),21);progressBar(c,t,738,452,510);}
+  else if(boolfield(m,"installed")){power(c,m,738,416,245);button(c,1003,416,245,"Configure creation","ui.settings");}
+  else if(boolfield(m,"subscription_available"))button(c,738,416,510,"Subscribe & download","ui.subscribe",argsFor(id),true);
   std::string note=boolfield(m,"adapter")?"Local build. Downloadable releases are still being prepared.":boolfield(m,"subscribed")?"New updates download automatically, even while Off.":"Subscribe to download this creation and receive updates.";wrap(c,738,488,508,note,16,2);
   int tx=738;for(auto t:{"about","settings","credits","links"}){std::string name=t;name[0]=toupper(name[0]);button(c,tx,541,120,name,std::string("ui.tab.")+t,"{}",false,42);if(tab==t)c.rect(tx+10,581,100,3,.36,.66,1.0);tx+=130;}
   if(tab=="about"){wrap(c,738,616,508,textfield(m,"about"),18,5);auto*links=field(m,"links");for(size_t i=0;links&&i<std::min(size_t(2),json_object_array_length(links));i++){auto*l=json_object_array_get_idx(links,i);button(c,738+int(i)*260,773,248,textfield(l,"label"),"module.link",argsFor(id,"index",json_object_new_int(i)),false,48);}}
   else if(tab=="settings"){
    if(!boolfield(m,"installed")){wrap(c,738,625,508,"Subscribe and download this creation to configure it.",20,3);return;}
    text(c,738,621,"On your shelf",21);text(c,738,650,boolfield(m,"enabled")?"Running and ready to use.":"Off. Saved data is kept.",16,true,330);button(c,1104,604,144,boolfield(m,"enabled")?"Turn off":"Turn on","module.toggle",argsFor(id,"enabled",json_object_new_boolean(!boolfield(m,"enabled"))));
-   if(boolfield(m,"can_configure")||boolfield(m,"adapter")){button(c,738,676,510,"Open device settings in VR","module.open",argsFor(id));if(!boolfield(m,"adapter")){if(boolfield(m,"subscribed"))button(c,738,738,245,"Unsubscribe","module.subscribe",argsFor(id,"subscribed",json_object_new_boolean(false)));button(c,1003,738,245,"Remove download","ui.remove",argsFor(id));}text(c,738,818,"Opening settings turns this creation on.",16,true,508);}else{int y=679;if(boolfield(m,"subscribed")){button(c,738,y,245,"Unsubscribe","module.subscribe",argsFor(id,"subscribed",json_object_new_boolean(false)));y+=58;}if(field(m,"update")){button(c,738,y,245,"Review update","ui.update",argsFor(id));y+=58;}button(c,1003,737,245,"Remove download","ui.remove",argsFor(id));if(!boolfield(m,"subscribed"))text(c,738,800,"Subscribe to receive automatic updates.",16,true,508);}
+   if(boolfield(m,"can_configure")||boolfield(m,"adapter")){button(c,738,676,510,"Open device settings in VR","module.open",argsFor(id));if(!boolfield(m,"adapter")){if(field(m,"update"))button(c,738,738,245,"Review update","ui.update",argsFor(id));else if(boolfield(m,"subscribed"))button(c,738,738,245,"Unsubscribe","module.subscribe",argsFor(id,"subscribed",json_object_new_boolean(false)));else button(c,738,738,245,"Subscribe for updates","ui.subscribe",argsFor(id));button(c,1003,738,245,"Remove download","ui.remove",argsFor(id));}text(c,738,818,"Opening settings turns this creation on.",16,true,508);}else{int y=679;if(boolfield(m,"subscribed")){button(c,738,y,245,"Unsubscribe","module.subscribe",argsFor(id,"subscribed",json_object_new_boolean(false)));y+=58;}else if(boolfield(m,"subscription_available")){button(c,738,y,245,"Subscribe for updates","ui.subscribe",argsFor(id));y+=58;}if(field(m,"update")){button(c,738,y,245,"Review update","ui.update",argsFor(id));}button(c,1003,737,245,"Remove download","ui.remove",argsFor(id));}
   }else if(tab=="links"){
    auto*links=field(m,"links");int total=links?json_object_array_length(links):0;linkPage=std::clamp(linkPage,0,std::max(0,(total-1)/3));
    for(int i=linkPage*3;i<std::min(total,linkPage*3+3);i++){auto*l=json_object_array_get_idx(links,i);button(c,738,607+(i%3)*60,510,textfield(l,"label")+" >","module.link",argsFor(id,"index",json_object_new_int(i)));}
@@ -149,9 +168,21 @@ struct StoreUI{
   if(!n)wrap(c,738,627,508,"By "+textfield(m,"author")+". "+textfield(m,"license"),20,4);for(size_t i=0;i<buttonsFor.size();i++)button(c,738+int(i)*260,752,248,buttonsFor[i].first,"module.link",argsFor(textfield(m,"id"),"index",json_object_new_int(buttonsFor[i].second)),false,44);
   if(n>1){button(c,738,803,245,"< Previous credit","ui.credit-prev","{}",false,36);button(c,1003,803,245,"Next credit >","ui.credit-next","{}",false,36);}
  }
- void review(Canvas&c,json_object*state){auto*m=find(state,reviewId);if(!m){reviewId.clear();return;}bool remove=reviewMethod=="module.remove";auto*target=field(m,"update");if(!target)target=m;text(c,278,169,remove?"MANAGE YOUR DOWNLOAD":"SUBSCRIBE & DOWNLOAD",15,true);text(c,278,226,(remove?"Remove ":reviewMethod=="module.install"?"Update ":"Subscribe to ")+textfield(m,"name")+"?",34,false,940);wrap(c,278,285,875,remove?"This stops the creation and its subscription. Your saved data is kept.":"Subscriptions install future updates automatically. You choose when to turn the creation on.",24,4);
-  if(!remove){auto*p=field(target,"permissions");std::string labels;for(size_t i=0;p&&i<json_object_array_length(p);i++){if(i)labels+="  /  ";labels+=json_object_get_string(json_object_array_get_idx(p,i));}text(c,278,446,"Permissions",19,true);wrap(c,278,483,870,labels,23,3);text(c,278,578,"Additional permissions will ask for a review.",20,true);}
-  button(c,278,666,230,"Cancel","ui.cancel");button(c,533,666,500,remove?"Remove download":reviewMethod=="module.install"?"Download update":"Subscribe & download","ui.confirm","{}",true);
+ void review(Canvas&c,json_object*state){
+  auto*m=find(state,reviewId);if(!m){reviewId.clear();return;}bool remove=reviewMethod=="module.remove";auto*target=field(m,"update");if(!target)target=m;
+  text(c,278,169,remove?"MANAGE YOUR CREATION":"BEFORE YOU INSTALL",15,true);
+  text(c,278,226,(remove?"Remove ":reviewMethod=="module.install"?"Update ":"Subscribe to ")+textfield(m,"name")+"?",34,false,940);
+  wrap(c,278,276,925,remove?"This stops the creation and its subscription. Your saved data is kept.":"MagicShelf will download and install it for you. Then use On / Off on its collection card. Future updates install automatically while subscribed.",20,3);
+  if(!remove){
+   text(c,278,368,"What this creation can do",23);
+   auto*details=field(target,"permission_details");
+   for(size_t i=0;details&&i<json_object_array_length(details)&&i<4;i++){
+    auto*p=json_object_array_get_idx(details,i);int y=405+int(i)*66;
+    text(c,278,y,textfield(p,"title"),19);wrap(c,278,y+24,925,textfield(p,"description"),16,2);
+   }
+   wrap(c,278,690,925,"Creations run with access to your SteamOS account. If an update asks for more access, MagicShelf will ask you again.",16,2);
+  }
+  button(c,278,755,230,"Cancel","ui.cancel");button(c,533,755,500,remove?"Remove creation":reviewMethod=="module.install"?"Install update":"Subscribe & install","ui.confirm","{}",true);
  }
  // Navigation stays local. Only concrete user actions produce manager requests.
  bool local(const StoreButton&b,json_object*state,std::string&method,std::string&params){auto*arg=json_tokener_parse(b.params.c_str());std::string id=textfield(arg,"id");if(arg)json_object_put(arg);

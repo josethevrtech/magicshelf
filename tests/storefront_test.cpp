@@ -2,7 +2,25 @@
 #include <cassert>
 #include <iostream>
 void check(StoreUI&ui,Canvas&c,json_object*state){ui.draw(c,state,false,"Ready");for(size_t i=0;i<ui.buttons.size();i++){auto&a=ui.buttons[i];assert(a.x>=0&&a.y>=0&&a.x+a.w<=StoreUI::W&&a.y+a.h<=StoreUI::H);assert(a.w>=36&&a.h>=36);assert(a.hit(a.x+a.w/2,a.y+a.h/2));for(size_t j=0;j<i;j++){auto&b=ui.buttons[j];bool overlap=a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;if(overlap)std::cerr<<ui.key()<<" overlap "<<a.method<<" at "<<a.x<<","<<a.y<<" with "<<b.method<<" at "<<b.x<<","<<b.y<<"\n";assert(!overlap);}}}
-int main(){auto*state=json_tokener_parse(R"({"version":"0.2.0","modules":[{"id":"org.test.phone","name":"Phone","author":"josethevrtech","category":"Utilities","description":"A creation","installed":true,"adapter":true,"enabled":false,"permissions":["vr-overlay"],"credits":[{"name":"Artist","role":"3D model","url":"https://x.com/artist"}],"links":[{"label":"Project","url":"https://github.com/a/b"},{"label":"Source","url":"https://github.com/a/c"},{"label":"Issues","url":"https://github.com/a/b/issues"},{"label":"Guide","url":"https://github.com/a/b/wiki"}]},{"id":"org.test.download","name":"A free creation","author":"josethevrtech","category":"Companions","description":"Downloaded creation","installed":false,"subscription_available":true,"permissions":["vr-overlay","network"]}]})");Canvas c(StoreUI::W,StoreUI::H);StoreUI ui;check(ui,c,state);std::string method,params;
+int main(){auto*state=json_tokener_parse(R"({"version":"0.2.0","modules":[{"id":"org.test.phone","name":"Phone","author":"josethevrtech","category":"Utilities","description":"A creation","installed":true,"adapter":true,"enabled":false,"permissions":["vr-overlay"],"credits":[{"name":"Artist","role":"3D model","url":"https://x.com/artist"}],"links":[{"label":"Project","url":"https://github.com/a/b"},{"label":"Source","url":"https://github.com/a/c"},{"label":"Issues","url":"https://github.com/a/b/issues"},{"label":"Guide","url":"https://github.com/a/b/wiki"}]},{"id":"org.test.download","name":"A test creation","author":"josethevrtech","category":"Companions","description":"Downloaded creation","installed":false,"subscription_available":true,"permissions":["vr-overlay","network"]}]})");Canvas c(StoreUI::W,StoreUI::H);StoreUI ui;check(ui,c,state);std::string method,params;
+// Home-card power controls are separate from the card's navigation target.
+for(auto view:{"discover","library"}){
+ ui.view=view;check(ui,c,state);bool found=false;StoreInput cardInput;
+ for(auto b:ui.buttons)if(b.method=="module.toggle"){
+  float x=b.x+b.w/2.f,y=b.y+b.h/2.f;auto hit=StoreInput::target(ui,x,y,false);assert(hit&&hit->method=="module.toggle");
+  cardInput.down(ui,x,y,false);auto released=cardInput.up(ui,x,y,false);assert(released);
+  assert(ui.local(*released,state,method,params));auto*p=json_tokener_parse(params.c_str());assert(boolfield(p,"enabled"));json_object_put(p);
+  assert(ui.selected.empty());assert(!StoreInput::target(ui,x,y,true));found=true;
+ }
+ assert(found);
+}
+auto*phone=ui.find(state,"org.test.phone");json_object_object_add(phone,"enabled",json_object_new_boolean(true));check(ui,c,state);
+for(auto b:ui.buttons)if(b.method=="module.toggle"){auto*p=json_tokener_parse(b.params.c_str());assert(!boolfield(p,"enabled"));json_object_put(p);}
+json_object_object_add(phone,"enabled",json_object_new_boolean(false));ui.view="discover";
+auto*transfer=json_tokener_parse(R"({"id":"org.test.phone","name":"Phone","stage":"downloading","received_bytes":50,"total_bytes":100,"active":true})");json_object_object_add(state,"transfer",transfer);
+assert(ui.fraction(transfer)==.5);check(ui,c,state);for(auto b:ui.buttons)assert(b.method!="module.toggle");
+for(auto stage:{"checking","installing","complete","failed"}){json_object_object_add(transfer,"stage",json_object_new_string(stage));check(ui,c,state);}
+json_object_object_del(state,"transfer");
 assert(!ui.local({0,0,0,0,"ui.detail",argsFor("org.test.download")},state,method,params));assert(ui.selected=="org.test.download");check(ui,c,state);
 assert(!ui.local({0,0,0,0,"ui.subscribe",argsFor(ui.selected)},state,method,params));check(ui,c,state);assert(ui.reviewId==ui.selected);assert(ui.local({0,0,0,0,"ui.confirm","{}"},state,method,params));assert(method=="module.subscribe");auto*p=json_tokener_parse(params.c_str());assert(textfield(p,"id")=="org.test.download");assert(boolfield(p,"subscribed"));assert(json_object_array_length(field(p,"permissions"))==2);json_object_put(p);
 ui.selected="org.test.phone";for(auto t:{"about","settings","credits","links"}){ui.tab=t;check(ui,c,state);}assert(ui.local({0,0,0,0,"module.toggle",argsFor(ui.selected,"enabled",json_object_new_boolean(true))},state,method,params));assert(method=="module.toggle");

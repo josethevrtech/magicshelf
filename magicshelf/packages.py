@@ -21,17 +21,21 @@ class GithubRedirect(urllib.request.HTTPRedirectHandler):
         check_url(newurl)
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
-def download(url, path, limit=MAX_BYTES):
+def download(url, path, limit=MAX_BYTES, progress=None):
     check_url(url)
     opener = urllib.request.build_opener(GithubRedirect())
     request = urllib.request.Request(url, headers={"User-Agent": "MagicShelf/0.1", "Accept": "application/octet-stream"})
     count = 0
+    if progress:
+        progress(0)
     with opener.open(request, timeout=30) as response, open(path, "xb") as output:
         check_url(response.geturl())
         while chunk := response.read(65536):
             count += len(chunk)
             require(count <= limit, "Download exceeds its declared limit")
             output.write(chunk)
+            if progress:
+                progress(count)
     return count
 
 def unpack(archive, destination, expected_hash, expected=None):

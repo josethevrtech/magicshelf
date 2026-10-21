@@ -312,3 +312,33 @@ creations home; app preferences and opacity changes do not reposition them.
 
 Controller feedback on these new controls is pending the user's headset check.
 This is a local installation; the public framework installer remains 0.1.3.
+
+## Collection power controls and installation feedback 0.3.4 — October 21, 2026
+
+Installed creation cards now expose On/Off directly in Discover and My Shelf,
+with the same control at the top of a creation's page. Card navigation and power
+have separate hit targets. Download progress reports actual received bytes and
+percentage, followed by checking, installing and ready states. Downloads already
+installed automatically; the UI now consistently calls the result **Installed**
+and explains how to turn it on. Install reviews explain each declared permission
+in everyday language while preserving the underlying approval values.
+
+- All 69 Python tests pass locally and on the Frame. New coverage checks actual
+  byte counts, download limits, progress publication, automatic installation,
+  corrupt-download recovery, and permission explanations for installs/updates.
+- Native checks pass on both architectures for direct card toggles, correct
+  creation IDs and On/Off values, navigation without activating power, disabled
+  actions while busy, pagination and non-overlapping hit targets. GPU texture
+  tests still pass. Native previews of cards, progress and all four permissions
+  were visually inspected; the diagnostic JavaScript parses successfully.
+- The verified 0.3.4 ARM bundle installed on the Frame. The Phone was running
+  before and after installation with PID 646474; SteamVR retained PID 2571.
+  Existing preferences remained unchanged.
+- A live Digivice subscription downloaded its public 0.2.3 package, reporting
+  0, 65,536 and 92,354 bytes. It then installed automatically and reached the
+  complete state, subscribed and Off, without a second installation action.
+  The temporary installation was removed to restore the user's initial choice;
+  the Phone and SteamVR kept their process IDs throughout. Saved data was kept.
+
+Headset confirmation of the new card controls and permission wording is pending.
+This is a local installation; the public framework installer remains 0.1.3.

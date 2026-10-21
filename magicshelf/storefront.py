@@ -7,6 +7,16 @@ from .packages import check_url, download
 
 MEDIA = Path(__file__).parent / 'web/media'
 PROJECT = 'https://github.com/josethevrtech/magicshelf'
+PERMISSION_DETAILS = {
+    'vr-overlay': ('Show in your VR space', 'Displays the creation in SteamVR and lets your controllers interact with it.'),
+    'network': ('Use the internet', 'Connects to online services and downloads files used by the creation.'),
+    'user-files': ('Read and save files', 'Can read or change files your SteamOS account can access, including saves and files you import.'),
+    'external-runtime': ('Run supporting software', 'Starts other software, such as Android or a game, to make this creation work.'),
+}
+
+def permission_details(meta):
+    return [dict(id=p, title=PERMISSION_DETAILS[p][0], description=PERMISSION_DETAILS[p][1]) for p in meta.get('permissions', [])]
+
 BUILTINS = {
     'org.magicshelf.android-phone': {
         'category': 'Utilities', 'author': 'josethevrtech',
@@ -64,6 +74,9 @@ def cache_images(items, root):
 def decorate(meta, root):
     builtin = BUILTINS.get(meta['id'], {}) if meta.get('adapter') else {}
     value = {**meta, **builtin}
+    value['permission_details'] = permission_details(value)
+    if value.get('update'):
+        value['update'] = {**value['update'], 'permission_details': permission_details(value['update'])}
     value.setdefault('category', 'Creations')
     value.setdefault('about', value['description'])
     value.setdefault('links', [])

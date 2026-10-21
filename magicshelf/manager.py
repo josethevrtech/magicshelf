@@ -95,6 +95,7 @@ class Manager:
         self.update_message = "Subscriptions check for updates automatically."
         self.message = "Ready"
         self.busy = False
+        self.transfer = None
         self.publish()
 
     @contextlib.contextmanager
@@ -313,7 +314,8 @@ class Manager:
 
     def install(self, key, permissions):
         with self.transaction():
-            return self.install_item(key, permissions)
+            self.install_item(key, permissions)
+        return self.snapshot()
 
     def refresh_and_sync(self):
         self.refresh()
@@ -326,13 +328,33 @@ class Manager:
         require(isinstance(permissions, list) and set(permissions) == set(item["permissions"]), "Review this creation's permissions before installing")
         old = self.state["modules"].get(key)
         require(not old or not old.get("catalog_url") or old["catalog_url"] == item["catalog_url"], "A different collection cannot replace this creation")
-        with tempfile.TemporaryDirectory(dir=self.root) as temp:
-            archive = Path(temp) / "module.magicshelf"
-            download(item["url"], archive, item["size_bytes"])
-            require(archive.stat().st_size == item["size_bytes"], "Package size differs from catalog")
-            staged = Path(temp) / "unpacked"
-            unpack(archive, staged, item["sha256"], item)
-            return self.commit_package(key, item["version"], staged, item["catalog_url"])
+        self.transfer = dict(id=key, name=item['name'], stage='downloading', received_bytes=0, total_bytes=item['size_bytes'], active=True)
+        last_publish = 0.
+        def progress(received):
+            nonlocal last_publish
+            self.transfer = {**self.transfer, 'received_bytes': received}
+            now = time.monotonic()
+            if now - last_publish >= .2 or received == item['size_bytes']:
+                self.publish()
+                last_publish = now
+        def stage(name, active=True, **extra):
+            self.transfer = {**self.transfer, 'stage': name, 'active': active, **extra}
+            self.publish()
+        try:
+            with tempfile.TemporaryDirectory(dir=self.root) as temp:
+                archive = Path(temp) / "module.magicshelf"
+                download(item["url"], archive, item["size_bytes"], progress=progress)
+                require(archive.stat().st_size == item["size_bytes"], "Package size differs from catalog")
+                stage('checking', received_bytes=item['size_bytes'])
+                staged = Path(temp) / "unpacked"
+                unpack(archive, staged, item["sha256"], item)
+                stage('installing')
+                self.commit_package(key, item["version"], staged, item["catalog_url"])
+                stage('complete', active=False)
+                return self.snapshot()
+        except Exception as error:
+            stage('failed', active=False, error=str(error)[:180])
+            raise
 
     def subscribe(self, key, subscribed, permissions=None):
         require(type(subscribed) is bool, "subscribed must be true or false")
@@ -352,7 +374,7 @@ class Manager:
                     self.install_item(key, permissions)
                 self.state["subscriptions"][key] = {"catalog_url": item["catalog_url"], "permissions": list(permissions)}
                 self.save()
-                self.message = "Subscribed. Future updates download automatically."
+                self.message = "Installed and subscribed. Future updates install automatically."
         return self.snapshot()
 
     def sync_subscriptions(self, refresh=True):
@@ -527,6 +549,8 @@ class Manager:
             (self.units / self.unit(key)).unlink(missing_ok=True)
             self.system.call("daemon-reload")
             shutil.rmtree(self.root / "modules" / key)
+            if self.transfer and self.transfer['id'] == key:
+                self.transfer = None
             self.message = "Creation removed; its saved data is kept"
         return self.snapshot()
 
@@ -592,7 +616,7 @@ class Manager:
             item["subscribed"] = bool(sub)
             item["subscription_available"] = not self.is_adapter(item["id"]) and any(i["id"] == item["id"] for i in self.state["catalog"])
             item["update_mode"] = "local" if self.is_adapter(item["id"]) else "automatic" if sub else "manual"
-        return {"api_version": 1, "version": VERSION, "modules": modules, "catalogs": self.state["catalogs"], "preferences": preferences.snapshot(load(self.layoutpath)), "busy": self.busy, "message": self.message, "update_message": self.update_message}
+        return {"api_version": 1, "version": VERSION, "modules": modules, "catalogs": self.state["catalogs"], "preferences": preferences.snapshot(load(self.layoutpath)), "transfer": self.transfer, "busy": self.busy, "message": self.message, "update_message": self.update_message}
 
     def publish(self):
         atomic(self.runtime / "ui-state.json", self.snapshot())

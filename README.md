@@ -35,7 +35,7 @@ is recorded in [docs/VALIDATION.md](docs/VALIDATION.md).
 
 ## Your collection
 
-The storefront is installed locally as **0.3.3** for testing. The public installer
+The storefront is installed locally as **0.3.4** for testing. The public installer
 above remains **0.1.3** until a new release is published. The VR storefront opens
 at 1.8 m wide and renders at 2560 × 1800 for sharper text. The desktop shortcut
 opens this same native dashboard. The display stays on one GPU texture while
@@ -44,15 +44,21 @@ Release the trigger over a control to activate it, or move away to cancel.
 Navigation remains available while downloads and updates run.
 
 - **Discover** shows screenshot cards; **My Shelf** shows your installed creations.
+- Installed creations have an **On / Off** control directly on their collection
+  card and at the top of their detail page.
 - Open a creation for its gallery, settings, GitHub links and artist credits.
   Support links are optional and go directly to the creator's page.
 - **Subscribe & download** installs a creation. Subscribed packages check for updates at
   startup and every 15 minutes while MagicShelf runs, including while Off.
+  The download progress bar shows actual bytes and percentage, followed by
+  checking and installation. Installation finishes automatically; use the card's
+  power control when you want to run it.
 - On/Off controls running the creation separately from its subscription.
   Unsubscribing keeps the installation and saved data; removing it also cancels
   the subscription and keeps saved data.
 - New permissions require review. Failed updates retain the previous working
   version and data; **Restore previous version** supports manual recovery.
+  The review explains each permission in everyday language before installation.
 - **Return creations home** returns active creations to their shelf slots.
 - **Settings** customizes shelf size, spacing, opacity and visibility; placement,
   angle and creation lean; and the app's window size and starting view. Layout
