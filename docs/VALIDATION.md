@@ -511,3 +511,37 @@ coverage.
 - Rendered and visually checked idle setup and 40% download progress with the
   installed native binary using isolated fixtures. These fixtures never replaced
   the running app state. Fresh device Steam confirmation remains a beta check.
+
+## 0.3.11 automatic support setup
+
+- The running Frame Steam client accepts `steam -ifrunning -silent +app_install`
+  without an installation dialog. A fresh installation of Valve's disposable
+  Spacewar test app completed through this command. The production setup worker
+  then repeated the test from an absent app, using an isolated MagicShelf manager,
+  a declared required file, and the real Steam client. It moved from queued to
+  running to ready in two seconds and cleared its persisted job. The test app
+  was removed afterward. Steam PID 2700, SteamVR PID 2571 and Phone PID 1136991
+  stayed unchanged.
+- A fixture with the wrong filename case remained incomplete despite Steam's
+  successful download, confirming that command acceptance and download completion
+  alone do not satisfy the required-file check. Correcting the isolated fixture
+  to the actual filename made the full worker test pass.
+- Steam refused to remove the shared ARM64 runtime because installed games depend
+  on it; it remained installed. An old ARM64 runtime without an account license
+  did not download. These results motivate preserving shared support, bounded
+  retries, and the manual Steam fallback instead of claiming universal success.
+- All 112 Python tests pass locally and on Frame. Native control and hit-target
+  checks, JavaScript syntax, the ARM64 build, and GitHub framework checks pass.
+  Coverage includes restart recovery, retry limits, repeated requests, skipped
+  existing support, removed/replaced creations, malformed jobs, scoped app IDs,
+  and false-success prevention when a Steam command returns without installing.
+- Installed the exact verified 0.3.11 archive. Manager and native renderer are
+  healthy with zero automatic restarts. Creation versions, On/Off states,
+  subscriptions, preferences, SteamVR and Phone processes were preserved.
+  Setup and retry views were inspected using isolated native preview fixtures.
+
+The live download test uses the existing signed-in Steam account and a disposable
+Valve app, not a factory-fresh Frame or fresh downloads of all three creation
+requirements. First-time access to those components on a tester's own account
+remains a beta check. The Steam client command was verified on the current Frame
+build; the fallback remains available if client behavior or account access differs.
