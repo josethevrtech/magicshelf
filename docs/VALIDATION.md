@@ -496,3 +496,18 @@ Smartphone Digivice 0.2.5. A separate first-time Frame installation, Steam's dow
 confirmation dialogs on that device, and a physical reboot remain human beta
 checks; automated interruption recovery does not establish physical power-loss
 coverage.
+
+## 0.3.10 setup polish
+
+- Creation setup presents the creation image, name, current step and one action.
+  Native checks verify that duplicate controls are absent, the action advances
+  to the next missing requirement, and normal controls return when ready.
+- All 102 Python tests, native storefront checks, JavaScript syntax validation
+  and the Steam Frame ARM64 build pass. GitHub's framework checks pass.
+- Installed the verified 0.3.10 archive on Frame. The manager and native dashboard
+  became healthy with zero automatic restarts. SteamVR PID 2571 and Phone PID
+  1136991 stayed running. Creation versions, subscriptions, On/Off states and
+  shelf preferences were unchanged.
+- Rendered and visually checked idle setup and 40% download progress with the
+  installed native binary using isolated fixtures. These fixtures never replaced
+  the running app state. Fresh device Steam confirmation remains a beta check.
