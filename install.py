@@ -113,7 +113,9 @@ WantedBy=steamvr.service
         from magicshelf.client import request
         for attempt in range(50):
             try:
-                request("snapshot", timeout=3)
+                ready = request("snapshot", timeout=3)
+                if ready.get("version") != metadata["version"]:
+                    raise RuntimeError("MagicShelf is still starting")
                 break
             except (OSError, RuntimeError):
                 if attempt == 49:
@@ -127,6 +129,17 @@ WantedBy=steamvr.service
         subprocess.run([str(current / "bin/magicshelf-bootstrap")], check=True, timeout=30)
         if system("is-active", "--quiet", "steamvr.service", check=False).returncode == 0:
             system("restart", "magicshelf-vr.service")
+            for attempt in range(100):
+                try:
+                    pid = int(system('show', 'magicshelf-vr.service', '-p', 'MainPID', '--value').stdout.strip())
+                    rendered = json.loads((runtime/'dashboard-render.json').read_text())
+                    if pid > 0 and rendered.get('pid') == pid and rendered.get('frames', 0) > 0:
+                        break
+                except (OSError, ValueError):
+                    pass
+                if attempt == 99:
+                    raise RuntimeError('MagicShelf could not open. Your previous version will be restored.')
+                time.sleep(.1)
         app = home / ".local/share/applications/com.josethevrtech.magicshelf.desktop"
         app.parent.mkdir(parents=True, exist_ok=True)
         # No % or shell expansion in desktop Exec; quote the complete executable path.

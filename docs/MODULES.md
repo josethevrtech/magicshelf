@@ -10,7 +10,7 @@ or explicitly reject it; it must not silently reinterpret an old module.
 A `.magicshelf` file is a ZIP containing `module.json` at the root, an executable,
 its assets and license. No install/uninstall shell hooks, links, absolute paths,
 parent-directory paths, encrypted entries, duplicate paths or special files are
-accepted. Limits are 100 MiB compressed, 400 MiB expanded, and 4,096 entries.
+accepted. Limits are 1 GiB compressed, 2 GiB expanded, and 4,096 entries.
 Files are extracted into staging and verified before becoming an installed version.
 
 ```json
@@ -235,3 +235,34 @@ MagicShelf 0.3.2 supports API 1 and API 2. API 2 adds package-owned control and
 cleanup entrypoints, explicit external-runtime permission, startup budgets and
 separate opaque runtime data/cache directories. See [CREATING.md](CREATING.md)
 for the lifecycle contract. Older hosts reject API 2 before installation.
+
+## Guided setup, MagicShelf 0.3.8 and newer
+
+A creation may declare `minimum_framework_version` as a semantic version and
+`steam_requirements` as up to four objects with `appid`, a plain-language `title`,
+and `files` relative to a Steam library's `steamapps/common` directory. The host
+checks installed Steam manifests and required files without executing the creation.
+Missing requirements show **Set up** in place of On. The setup page opens Steam's
+normal installation flow and detects download progress and completion. Package
+and catalog requirements must match exactly. The host passes each installed
+requirement directory as `MAGICSHELF_STEAM_APP_APPID_DIR` to support other libraries.
+
+`module.setup` accepts an installed creation `id` and one declared `appid`.
+A caller cannot use this endpoint to open arbitrary apps or commands. Creations
+own their requirements; MagicShelf does not hard-code Phone or Digivice setup.
+
+User-initiated `module.subscribe` and `module.install` requests now acknowledge a
+background job immediately. Poll the snapshot for transfer progress and completion;
+returning from the request does not mean the installation has finished.
+
+## MagicShelf updates
+
+The official latest framework release supplies `framework.json` with a version
+and per-architecture immutable URL, byte size and SHA-256. The host downloads and
+verifies this archive in the background. **Update and reopen** runs installation
+in a separate user service so restarting the manager does not interrupt it.
+The installer verifies the new manager version and a frame rendered by the new
+native process before accepting the update. Failure restores the previous release.
+A journal lets an interrupted worker restore the original release; startup detects
+an unfinished framework update after a device restart. Existing creation processes
+are not restarted by a framework upgrade.

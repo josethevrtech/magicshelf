@@ -66,7 +66,7 @@ void dashboard(){
    float width=json_object_get_double(field(prefs,"dashboard_width_m"));
    if(std::isfinite(width)&&width>=1.2f&&width<=2.4f&&fabsf(width-appliedWidth)>.001f){o->SetOverlayWidthInMeters(panel,width);appliedWidth=width;}
   }
-  bool working=busy||boolfield(j,"busy");
+  bool working=busy||boolfield(j,"busy")||textfield(field(j,"framework_update"),"stage")=="installing";
   vr::VREvent_t event;
   while(vr::VRSystem()->PollNextEvent(&event,sizeof(event)))if(event.eventType==vr::VREvent_Quit){vr::VRSystem()->AcknowledgeQuit_Exiting();running=false;}
   while(o->PollNextOverlayEvent(panel,&event,sizeof(event))){
@@ -81,7 +81,7 @@ void dashboard(){
     std::string method,params;auto before=ui.key();if(ui.local(*hit,j,method,params))action(method,params);
     if(ui.key()!=before)input.cancel();
     o->TriggerLaserMouseHapticVibration(panel,.012f,90.f,.16f);
-    working=busy||boolfield(j,"busy");
+    working=busy||boolfield(j,"busy")||textfield(field(j,"framework_update"),"stage")=="installing";
    }
   }
   std::string failure;{std::lock_guard<std::mutex>lock(stateMutex);failure=actionError;}
@@ -99,7 +99,7 @@ void dashboard(){
     gpu.update(canvas,damage.x*RenderScale,damage.y*RenderScale,(damage.right-damage.x)*RenderScale,(damage.bottom-damage.y)*RenderScale);gpu.present(o,panel);
     frames++;if(full)fullFrames++;else partialFrames++;
     double ms=std::chrono::duration<double,std::milli>(Clock::now()-started).count();peakMs=std::max(peakMs,ms);
-    std::ofstream stats(dir+"/dashboard-render.json");stats<<"{\"frames\":"<<frames<<",\"full\":"<<fullFrames<<",\"partial\":"<<partialFrames<<",\"texture_allocations\":1,\"last_ms\":"<<ms<<",\"peak_ms\":"<<peakMs<<",\"width\":"<<canvas.w<<",\"height\":"<<canvas.h<<"}\n";
+    std::ofstream stats(dir+"/dashboard-render.json");stats<<"{\"pid\":"<<getpid()<<",\"frames\":"<<frames<<",\"full\":"<<fullFrames<<",\"partial\":"<<partialFrames<<",\"texture_allocations\":1,\"last_ms\":"<<ms<<",\"peak_ms\":"<<peakMs<<",\"width\":"<<canvas.w<<",\"height\":"<<canvas.h<<"}\n";
    }
    if(capture){canvas.png(dir+"/dashboard-capture.png");std::filesystem::remove(dir+"/capture-dashboard.request");}
    previous=key;previousHover=input.hover;previousPressed=input.pressed;

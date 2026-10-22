@@ -426,3 +426,31 @@ new-user installation. The public framework installer remains 0.1.3 and there is
 no framework self-updater. The Phone needs its Steam Android runtime; Digivice
 needs separately imported game/model inputs and Steam compatibility runtimes.
 See [TESTER_READINESS.md](TESTER_READINESS.md) for the remaining fresh-device work.
+
+## Guided setup and framework updates, 0.3.9
+
+The 0.3.8 development build introduced framework updates and creation-owned Steam
+requirements. It installed successfully on the Frame, verified a frame from the
+new dashboard process, and left SteamVR PID 2571 and Phone PID 797771 unchanged.
+The final 0.3.9 build adds the graphical public installer and recovery after an
+interrupted framework worker or device restart.
+
+- The graphical installer progress dialog was exercised on Frame using KDE's
+  supported interface. Its reported value tracked the supplied byte progress,
+  stage labels changed, and the dialog closed correctly.
+- Fresh Android preparation ran against the Frame's actual Steam Lepton files in
+  an isolated empty cache. Repeating preparation succeeded without altering the
+  running Android session. Automated tests preserve the prior private runtime on
+  failure and recover an interrupted directory swap without touching Android data.
+- Both new creation packages built on Frame. Phone geometry/input checks and
+  runtime-preparation checks pass. Digivice geometry/input, metadata and capture
+  recovery checks pass. Its build fetched the public permission-cleared input
+  archive, verified the pinned hash, and packaged game/model files directly.
+- Setup requirements use the creations' Steam application IDs and installed-file
+  checks. Tests use empty homes and synthetic Steam download manifests, including
+  installation completion. They do not install Steam dependencies on fresh hardware.
+- Framework tests cover archive verification, path escape, wrong publishers,
+  interrupted-worker restoration, startup recovery and dashboard health failure.
+  Native controls cover setup navigation and distinct update/retry actions.
+
+Public-release and live in-app update results are recorded below when completed.

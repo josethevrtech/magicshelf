@@ -1,60 +1,61 @@
 # Exclusive testing readiness
 
-Status on October 21, 2026: MagicShelf 0.3.7 is installed and validated on the
-development Steam Frame. It is not yet a fresh-device tester release. The public
-framework installer still downloads 0.1.3. Independent creations require the newer
-framework, and reinstalling them on the development Frame reused existing inputs.
+MagicShelf 0.3.9 provides a graphical installer, guided creation setup and an
+in-app framework updater for Steam Frame. Creations retain independent repositories
+and subscriptions. Every creation is available without payment or an account.
 
-## Verified update behavior
+## The tester experience
 
-- Catalog checks run after startup and every five minutes. Manual checks return
-  immediately. An unavailable publisher does not prevent healthy catalogs updating.
-- A subscribed creation keeps running while its update downloads. Turning it Off
-  installs the verified cached archive. An already Off creation updates directly.
-- Transient downloads retry, incomplete files are discarded, and failures leave
-  the installed version in place. New permissions require review.
-- Interrupted creation installs and restores recover from a journal. A failed
-  first start after an update installed while Off restores the previous version.
-- Restore previous holds the replaced release until explicit approval or a newer
-  release. Unsubscribing cancels pending installation. Saved module data is kept.
+1. Download and open **Install.MagicShelf.desktop** in Desktop Mode. The installer
+   shows progress, verifies its download and offers **Open MagicShelf** when ready.
+2. Choose a creation, read its plain-language permissions and select
+   **Subscribe & download**. Installation finishes automatically.
+3. If **Set up** appears, select it and choose **Install with Steam** for the
+   missing support download. Finish Steam's normal dialog and return to MagicShelf.
+   The app detects download progress and completion; no folder selection or
+   terminal commands are needed.
+4. Turn the creation On. Configure, Off and the shelf controls remain on its page
+   and collection card.
+5. Creation updates download in the background and install when that creation is
+   Off. MagicShelf updates download separately and offer **Update and reopen**.
+   A framework upgrade leaves running creations and SteamVR running.
 
-These checks cover creation updates. There is no automatic updater for the
-MagicShelf framework itself yet. Recovery backups cover `module-data`; external
-runtime data is owned by each creation and needs separate validation.
+Android Phone (Virtual) 0.2.6 guides installation of Steam's Android support and
+prepares its private runtime safely. Smartphone Digivice 0.2.5 bundles its game
+and model with permission confirmed by the project owner; no import or model
+conversion is required. It guides installation of the two required Steam support
+packages. Steam may still require the user to confirm a download.
 
-## Required before inviting fresh-device testers
+## Recovery behavior
 
-1. Publish a compatible framework release and update its installer link only after
-   downloading and running the public artifact on a fresh supported device. The
-   existing 0.1.3 link does not install the current storefront/SDK.
-2. Give the framework a straightforward upgrade path for testers, with a clear
-   version, progress, failure recovery and a way to retry. Creation subscriptions
-   alone do not upgrade MagicShelf.
-3. Complete first-run setup for Android Phone (Virtual). Its runtime currently
-   requires Steam's Lepton installation and prepares a private copy of supported
-   runtime files. Check missing and changed Lepton versions on a fresh Frame.
-4. Complete first-run setup for Smartphone Digivice. Its runtime currently expects
-   separately imported game and model inputs under `creation-inputs`, plus Steam
-   ARM64 Proton and Steam Linux Runtime. A fresh subscription cannot supply those
-   inputs. Provide a supported package or clear guided setup and an actionable
-   missing-input screen before offering it to nontechnical testers.
-5. Test the public install, subscription, first launch and one real update using a
-   fresh user/device without the developer's accounts, inputs or cached runtime.
-   Confirm Configure, grab/depth, dock recovery and silence when Off, then repeat
-   after a normal device reboot. Reinstalling on the prepared development Frame
-   is not evidence of a successful fresh-device experience.
+Downloads are bounded, checked and retried after temporary connection failures.
+Creation updates preserve module data and recover interrupted installations.
+Restore previous holds the replaced version instead of immediately reinstalling
+it. A bad first start after an update installed while Off restores the previous
+creation. New permissions require explicit review.
 
-## Repeatable validation
+Framework installation verifies its file index, the new manager's version, and a
+rendered frame from the new native process. Failure restores the previous release.
+An independent worker survives manager restarts, and a journal handles interrupted
+worker execution. Startup detects unfinished framework work after a device restart.
+The graphical installer offers retry and keeps a local diagnostic log.
 
-Run `python3 -m unittest discover -s tests -v`, `bash tools/test_storefront.sh`
-and `bash tools/test_dashboard.sh`. Build on the advertised architecture.
+## Validation and first tester checks
 
-On a Frame with SteamVR running, run
-`python3 tools/test_update_lifecycle.py --live`. This creates and cleans up a
-disposable systemd creation, uses real readiness RPC, and verifies an active
-process survives background download, cached installation occurs after Off, and a
-bad first launch restores the working version and its saved module data. Transfers
-use local fixture packages; this does not replace a public download or fresh-device
-test. It does not load an overlay or change the user's collection.
+Automated checks cover empty-home requirement detection, Steam download progress,
+malformed requirements, verified framework downloads, archive tampering and path
+escape, interrupted update recovery, native setup/update hit targets and creation
+lifecycle behavior. See [VALIDATION.md](VALIDATION.md) for actual device results.
 
-Detailed results are recorded in [VALIDATION.md](VALIDATION.md).
+A prepared development Frame is not a factory-fresh device. Before expanding the
+invite group, have one tester complete installation and first launch on a separate
+supported Frame, including any Steam download prompts. Check opening both
+creations, Configure, grab/depth, returning to the dock, silence while Off and a
+normal reboot. Do not describe simulated recovery tests as physical power-loss or
+fresh-hardware testing.
+
+Repeatable checks: `python3 -m unittest discover -s tests -v`,
+`bash tools/test_storefront.sh`, `bash tools/test_dashboard.sh`, and
+`python3 tools/test_update_lifecycle.py --live` on a Frame with SteamVR running.
+The lifecycle probe uses an isolated disposable creation and real systemd/readiness
+RPC, with local package transfers. It leaves the user's collection alone.

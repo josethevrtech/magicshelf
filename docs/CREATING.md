@@ -113,7 +113,7 @@ All module API 1 packages remain supported. Old hosts reject API 2 packages.
 
 The phone and Digivice now use API 2 packages with independent backend
 lifecycles and private data directories. The phone requires Steam's Lepton;
-the Digivice requires ARM64 Proton/Steam Linux Runtime plus separately supplied
+the Digivice declares ARM64 Proton/Steam Linux Runtime setup and bundles its permitted
 game/model inputs. Those third-party files are not distributed by these source
 repositories. The old local adapter API 2 is a different, legacy protocol kept
 only for existing installations until they migrate.

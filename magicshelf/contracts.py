@@ -9,6 +9,8 @@ ID = re.compile(r"^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$")
 VERSION = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 PERMISSIONS = {"vr-overlay", "network", "user-files", "external-runtime"}
 MAX_MODULES = 16
+MAX_PACKAGE_BYTES = 1024 * 1024 * 1024
+MAX_EXPANDED_BYTES = 2 * 1024 * 1024 * 1024
 
 class ContractError(ValueError):
     pass
@@ -77,6 +79,19 @@ def manifest(data):
         if field in data:
             relative(data[field])
     require(type(data.get('startup_timeout_sec', 20)) is int and 20 <= data.get('startup_timeout_sec', 20) <= 180, 'Invalid startup timeout')
+    if 'minimum_framework_version' in data:
+        version(data['minimum_framework_version'])
+    requirements = data.get('steam_requirements', [])
+    require(isinstance(requirements, list) and len(requirements) <= 4, 'Invalid setup requirements')
+    require(not requirements or data['api_version'] == 2, 'Setup requirements need API 2')
+    ids = set()
+    for item in requirements:
+        require(isinstance(item, dict) and type(item.get('appid')) is int and 0 < item['appid'] <= 100000000 and item['appid'] not in ids, 'Invalid Steam requirement')
+        ids.add(item['appid'])
+        require(isinstance(item.get('title'), str) and 1 <= len(item['title']) <= 60, 'Invalid setup title')
+        require(isinstance(item.get('files'), list) and 1 <= len(item['files']) <= 8, 'Invalid setup files')
+        for name in item['files']:
+            relative(name)
     presentation(data)
     return data
 
@@ -91,7 +106,7 @@ def catalog(data):
         require(identity not in seen, "Duplicate catalog module architecture")
         seen.add(identity)
         require(isinstance(item.get("sha256"), str) and re.fullmatch(r"[a-f0-9]{64}", item["sha256"]), "Missing SHA-256")
-        require(isinstance(item.get("size_bytes"), int) and 0 < item["size_bytes"] <= 100 * 1024 * 1024, "Invalid download size")
+        require(isinstance(item.get("size_bytes"), int) and 0 < item["size_bytes"] <= MAX_PACKAGE_BYTES, "Invalid download size")
         require(isinstance(item.get("url"), str), "Missing package URL")
     return data
 

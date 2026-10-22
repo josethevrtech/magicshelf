@@ -129,6 +129,8 @@ class Updates:
         item = item or next((i for i in self.state["catalog"] if i["id"] == key), None)
         require(item is not None, "Creation is not in a followed collection")
         require(isinstance(permissions, list) and set(permissions) == set(item["permissions"]), "Review this creation's permissions before installing")
+        from . import VERSION
+        require(version(VERSION) >= version(item.get('minimum_framework_version', '0.0.0')), 'Update MagicShelf first, then download this creation. Choose Check updates in Settings.')
         old = self.state["modules"].get(key)
         require(not old or not old.get("catalog_url") or old["catalog_url"] == item["catalog_url"], "A different collection cannot replace this creation")
         require(not old or version(item["version"]) > version(old["version"]), "This version is already installed")

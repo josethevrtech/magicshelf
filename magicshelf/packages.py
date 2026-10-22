@@ -9,9 +9,9 @@ import urllib.request
 import urllib.parse
 import zipfile
 from pathlib import Path
-from .contracts import ContractError, manifest, relative, require
+from .contracts import ContractError, manifest, relative, require, MAX_PACKAGE_BYTES, MAX_EXPANDED_BYTES
 
-MAX_BYTES = 100 * 1024 * 1024
+MAX_BYTES = MAX_PACKAGE_BYTES
 HOSTS = {"github.com", "raw.githubusercontent.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com", "github-releases.githubusercontent.com"}
 
 def check_url(url):
@@ -33,7 +33,7 @@ def download(url, path, limit=MAX_BYTES, progress=None):
         raise FileExistsError(path)
     opener = urllib.request.build_opener(GithubRedirect())
     request = urllib.request.Request(url, headers={"User-Agent": "MagicShelf/0.1", "Accept": "application/octet-stream"})
-    deadline = time.monotonic() + 120
+    deadline = time.monotonic() + max(120, min(1800, limit / (256 * 1024)))
     for attempt in range(3):
         count, created = 0, False
         if progress:
@@ -77,7 +77,7 @@ def unpack(archive, destination, expected_hash, expected=None):
     destination.mkdir(parents=True, exist_ok=False)
     with zipfile.ZipFile(archive) as z:
         require(len(z.infolist()) <= 4096, "Too many package entries")
-        require(sum(i.file_size for i in z.infolist()) <= MAX_BYTES * 4, "Expanded package is too large")
+        require(sum(i.file_size for i in z.infolist()) <= MAX_EXPANDED_BYTES, "Expanded package is too large")
         seen = set()
         for info in z.infolist():
             name = info.filename.rstrip("/")
@@ -92,7 +92,7 @@ def unpack(archive, destination, expected_hash, expected=None):
         import json
         meta = manifest(json.loads(z.read("module.json")))
         if expected:
-            for key in ("id", "version", "api_version", "entrypoint", "architecture", "permissions", "memory_mb", "control_entrypoint", "cleanup_entrypoint", "startup_timeout_sec"):
+            for key in ("id", "version", "api_version", "entrypoint", "architecture", "permissions", "memory_mb", "control_entrypoint", "cleanup_entrypoint", "startup_timeout_sec", "steam_requirements", "minimum_framework_version"):
                 require(meta.get(key) == expected.get(key), "Package does not match its catalog: " + key)
         for info in z.infolist():
             target = destination / info.filename

@@ -44,6 +44,16 @@ class ReleaseTests(unittest.TestCase):
         expected=hashlib.sha256((self.root/'dist/install-magicshelf.py').read_bytes()).hexdigest()
         self.assertIn(expected,source)
         self.assertNotIn('@BOOTSTRAP',source)
+    def test_graphical_installer_and_update_manifest_are_pinned_to_same_archive(self):
+        from magicshelf.framework_updates import release_for
+        data=json.loads((self.root/'dist/framework.json').read_text())
+        item=release_for(data,'aarch64')
+        archive=self.root/('dist/magicshelf-'+builder.VERSION+'-linux-aarch64.tar.gz')
+        self.assertEqual(item['sha256'],hashlib.sha256(archive.read_bytes()).hexdigest())
+        self.assertEqual(item['size_bytes'],archive.stat().st_size)
+        self.assertIn('Terminal=false',(self.root/'dist/Install.MagicShelf.desktop').read_text())
+        ast.parse((self.root/'dist/install-magicshelf.py').read_text())
+
     def test_framework_release_does_not_build_or_bundle_creations(self):
         self.assertEqual(json.loads((self.root/'dist/catalog.json').read_text())['modules'], [])
         self.assertEqual(list((self.root/'dist').glob('*.magicshelf')), [])

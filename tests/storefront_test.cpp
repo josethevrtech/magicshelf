@@ -30,6 +30,11 @@ ui.selected="org.test.download";ui.tab="settings";
 for(auto status:{"ready","review","failed","held","available"}){json_object_object_add(download,"update_status",json_object_new_string(status));check(ui,c,state);bool restore=false,update=false;for(auto b:ui.buttons){restore|=b.method=="ui.rollback";update|=b.method=="ui.update";}assert(restore&&update);}
 ui.local({0,0,0,0,"ui.update",argsFor(ui.selected)},state,method,params);check(ui,c,state);assert(ui.reviewMethod=="module.subscribe");ui.local({0,0,0,0,"ui.confirm","{}"},state,method,params);assert(method=="module.subscribe");
 ui.local({0,0,0,0,"ui.rollback",argsFor(ui.selected)},state,method,params);check(ui,c,state);ui.local({0,0,0,0,"ui.confirm","{}"},state,method,params);assert(method=="module.rollback");auto*restoreArgs=json_tokener_parse(params.c_str());assert(textfield(restoreArgs,"id")=="org.test.download");json_object_put(restoreArgs);
+// Missing Steam prerequisites lead directly to a single setup action.
+json_object_object_add(download,"setup",json_tokener_parse(R"({"ready":false,"steps":[{"appid":123,"title":"Game support","ready":false,"received_bytes":20,"total_bytes":100}]})"));
+ui.selected.clear();check(ui,c,state);bool setupFound=false;for(auto b:ui.buttons)if(b.method=="ui.setup"){ui.local(b,state,method,params);setupFound=true;break;}assert(setupFound&&ui.tab=="settings");check(ui,c,state);
+for(auto b:ui.buttons)if(b.method=="module.setup"){ui.local(b,state,method,params);auto*p=json_tokener_parse(params.c_str());assert(json_object_get_int(field(p,"appid"))==123);json_object_put(p);}
+json_object_object_del(download,"setup");
 ui.selected.clear();auto*list=field(state,"modules");for(int i=0;i<9;i++){auto*m=json_tokener_parse(R"({"name":"A very long creation name to check clipping","description":"Long descriptions remain inside their own creation card and never cover another card's controls.","category":"Creations","installed":true})");json_object_object_add(m,"id",json_object_new_string(("org.test.extra"+std::to_string(i)).c_str()));json_object_array_add(list,m);}for(auto v:{"discover","library"}){ui.view=v;for(int page=0;page<4;page++){ui.page=page;check(ui,c,state);}}
 // Trigger presses commit on release over the same target. Page navigation stays
 // available while manager actions are pending; a changed target never fires.
@@ -38,6 +43,8 @@ auto*prefs=json_tokener_parse(R"({"values":{"opacity":0.72,"launcher_only":true}
 json_object_object_add(state,"preferences",prefs);
 assert(!ui.local({0,0,0,0,"ui.preferences","{}"},state,method,params));assert(ui.view=="settings"&&ui.selected.empty());
 for(auto group:{"shelf","placement","app","credits"}){ui.settingsTab=group;check(ui,c,state);}
+for(auto stage:{"current","downloading","ready","failed","installing"}){json_object_object_add(state,"framework_update",json_tokener_parse((std::string("{\"stage\":\"")+stage+"\",\"message\":\"Update status\",\"received_bytes\":20,\"total_bytes\":100}").c_str()));ui.settingsTab="app";check(ui,c,state);}
+ui.local({0,0,0,0,"ui.appupdates","{}"},state,method,params);assert(ui.view=="settings"&&ui.settingsTab=="app"&&ui.selected.empty());
 ui.settingsTab="shelf";check(ui,c,state);bool changed=false;
 for(auto b:ui.buttons)if(b.method=="settings.update"){
  assert(ui.local(b,state,method,params));assert(method=="settings.update");auto*p=json_tokener_parse(params.c_str());assert(field(p,"changes"));json_object_put(p);changed=true;

@@ -1,34 +1,103 @@
 #!/usr/bin/env python3
-"""MagicShelf's release-pinned, user-only installer."""
-import hashlib,os,pathlib,platform,shutil,subprocess,tarfile,tempfile,urllib.request
+"""Release-pinned graphical setup for SteamOS and Steam Frame."""
+import contextlib
+import hashlib
+import os
+import pathlib
+import platform
+import shutil
+import subprocess
+import tarfile
+import tempfile
+import time
+import urllib.error
+import urllib.request
+
+
+class Cancelled(Exception):
+    pass
+
+
+class Progress:
+    # KDE's supported progress-dialog DBus interface:
+    # https://develop.kde.org/docs/administration/kdialog/#progress-dialogs
+    def __init__(self):
+        self.ref=[];self.dbus=shutil.which('qdbus6') or shutil.which('qdbus');self.last=0
+        if self.dbus and shutil.which('kdialog'):
+            result=subprocess.run(['kdialog','--title','MagicShelf','--progressbar','Downloading MagicShelf…','100'],capture_output=True,text=True,timeout=10)
+            if result.returncode==0:self.ref=result.stdout.split()
+        self.call('showCancelButton','true')
+    def call(self,*args):
+        if self.ref:
+            with contextlib.suppress(OSError,subprocess.SubprocessError):
+                return subprocess.run([self.dbus,*self.ref,*args],capture_output=True,text=True,timeout=3).stdout.strip()
+        return ''
+    def download(self,received,total):
+        now=time.monotonic()
+        if now-self.last<.25 and received!=total:return
+        self.last=now
+        if self.call('wasCancelled')=='true':raise Cancelled()
+        if total:self.call('Set','','value',str(min(100,int(100*received/total))))
+        self.call('setLabelText',f'Downloading MagicShelf… {received/1048576:.1f} MB'+(f' of {total/1048576:.1f} MB' if total else ''))
+    def stage(self,label):
+        self.call('showCancelButton','false');self.call('setLabelText',label)
+    def close(self):self.call('close')
+
+
+def install():
+    if platform.system()!='Linux' or platform.machine()!='@ARCH@':
+        raise RuntimeError('This download is for Steam Frame. Please use the MagicShelf download for your device.')
+    progress=Progress()
+    try:
+        with tempfile.TemporaryDirectory(prefix='magicshelf-install-') as temp:
+            base=pathlib.Path(temp);archive=base/'magicshelf.tar.gz'
+            for attempt in range(3):
+                try:
+                    archive.unlink(missing_ok=True)
+                    with urllib.request.urlopen('@URL@',timeout=30) as response,archive.open('xb') as output:
+                        total=int(response.headers.get('Content-Length',0));size=0;digest=hashlib.sha256()
+                        while chunk:=response.read(65536):
+                            size+=len(chunk)
+                            if size>100*1024*1024:raise RuntimeError('This download could not be verified. Please try again.')
+                            output.write(chunk);digest.update(chunk);progress.download(size,total)
+                    break
+                except (urllib.error.URLError,TimeoutError,ConnectionError):
+                    if attempt==2:raise
+                    time.sleep(attempt+1)
+            progress.stage('Checking the download…')
+            if digest.hexdigest()!='@SHA256@':raise RuntimeError('The download did not pass verification. Nothing was installed. Please try again.')
+            with tarfile.open(archive) as tar:
+                members=tar.getmembers()
+                if len(members)>8192 or sum(m.size for m in members)>400*1024*1024:raise RuntimeError('The download could not be verified. Please try again.')
+                for m in members:
+                    p=pathlib.PurePosixPath(m.name)
+                    if p.is_absolute() or '..' in p.parts or not p.parts or p.parts[0]!='magicshelf' or not (m.isfile() or m.isdir()):raise RuntimeError('The download could not be verified. Please try again.')
+                tar.extractall(base,filter='data')
+            progress.stage('Setting up MagicShelf…')
+            result=subprocess.run(['python3',str(base/'magicshelf/install.py')],capture_output=True,text=True)
+            log=pathlib.Path.home()/'.local/state/magicshelf/install.log';log.parent.mkdir(parents=True,exist_ok=True);log.write_text(result.stdout+result.stderr);log.chmod(0o600)
+            if result.returncode:raise RuntimeError('Setup could not finish. Your creations and saved data are kept. Please try again.')
+    finally:
+        progress.close()
+
 
 def main():
-    if platform.system()!='Linux' or platform.machine()!='@ARCH@':
-        raise RuntimeError('This release supports Linux @ARCH@. Download the matching MagicShelf release for your device.')
-    with tempfile.TemporaryDirectory(prefix='magicshelf-install-') as temp:
-        base=pathlib.Path(temp);archive=base/'magicshelf.tar.gz'
-        with urllib.request.urlopen('@URL@',timeout=60) as response,archive.open('xb') as output:
-            size=0
-            while chunk:=response.read(65536):
-                size+=len(chunk)
-                if size>100*1024*1024:raise RuntimeError('Download exceeds limit')
-                output.write(chunk)
-        if hashlib.sha256(archive.read_bytes()).hexdigest()!='@SHA256@':raise RuntimeError('MagicShelf verification failed; nothing was installed.')
-        with tarfile.open(archive) as tar:
-            members=tar.getmembers()
-            if len(members)>8192 or sum(m.size for m in members)>400*1024*1024:raise RuntimeError('Invalid release size')
-            for m in members:
-                p=pathlib.PurePosixPath(m.name)
-                if p.is_absolute() or '..' in p.parts or not p.parts or p.parts[0]!='magicshelf' or not (m.isfile() or m.isdir()):raise RuntimeError('Unsafe release path')
-            tar.extractall(base,filter='data')
-        subprocess.run(['python3',str(base/'magicshelf/install.py')],check=True)
-    print('MagicShelf is ready. Open the MagicShelf desktop icon.')
-    try:subprocess.run(['kdialog','--msgbox','MagicShelf is installed. Open MagicShelf on your desktop or in SteamVR’s dashboard.'],check=False)
-    except FileNotFoundError:pass
-if __name__=='__main__':
-    try:main()
-    except Exception as error:
-        print('MagicShelf:',error)
-        try:subprocess.run(['kdialog','--error',str(error)],check=False)
-        except FileNotFoundError:pass
-        raise SystemExit(1)
+    while True:
+        try:
+            install();break
+        except Cancelled:
+            return
+        except Exception as error:
+            message='Could not connect. Check your Wi-Fi and try again.' if isinstance(error,(urllib.error.URLError,TimeoutError,ConnectionError)) else str(error)
+            if not shutil.which('kdialog'):raise
+            choice=subprocess.run(['kdialog','--title','MagicShelf','--yes-label','Try again','--no-label','Close','--warningyesno',message],check=False)
+            if choice.returncode:return
+    if shutil.which('kdialog'):
+        choice=subprocess.run(['kdialog','--title','MagicShelf is ready','--yes-label','Open MagicShelf','--no-label','Later','--yesno','Choose a creation you like and subscribe to download it. MagicShelf will keep it up to date.'],check=False)
+        if choice.returncode==0:
+            subprocess.Popen([str(pathlib.Path.home()/'.local/share/magicshelf/current/bin/magicshelf'),'open'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
+    else:
+        print('MagicShelf is ready. Open MagicShelf from your desktop or SteamVR.')
+
+
+if __name__=='__main__':main()

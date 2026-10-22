@@ -12,7 +12,7 @@ import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from magicshelf.contracts import catalog, load, manifest, relative, require
+from magicshelf.contracts import catalog, load, manifest, relative, require, MAX_EXPANDED_BYTES
 from magicshelf.packages import MAX_BYTES, unpack
 
 
@@ -28,7 +28,7 @@ def build(source, output, repository):
         mode = path.lstat().st_mode
         require(stat.S_ISREG(mode) or stat.S_ISDIR(mode), "Links and special files are not allowed")
     files = [p for p in paths if p.is_file()]
-    require(sum(p.stat().st_size for p in files) <= MAX_BYTES * 4, "Expanded package is too large")
+    require(sum(p.stat().st_size for p in files) <= MAX_EXPANDED_BYTES, "Expanded package is too large")
     entry = source / meta["entrypoint"]
     require(entry.is_file() and os.access(entry, os.X_OK), "Entrypoint must be executable")
     require((source / "LICENSE").is_file(), "Include a LICENSE describing the packaged content")
@@ -44,11 +44,16 @@ def build(source, output, repository):
                 info = zipfile.ZipInfo(path.relative_to(source).as_posix(), date_time=(2026, 1, 1, 0, 0, 0))
                 info.external_attr = (0o100755 if path.stat().st_mode & 0o111 else 0o100644) << 16
                 info.compress_type = zipfile.ZIP_DEFLATED
-                z.writestr(info, path.read_bytes())
-        digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+                with path.open('rb') as source_file, z.open(info, 'w', force_zip64=True) as target_file:
+                    import shutil
+                    shutil.copyfileobj(source_file, target_file)
+        with archive.open('rb') as stream:
+            digest = hashlib.file_digest(stream, 'sha256').hexdigest()
         unpack(archive, Path(temp) / "verify", digest, meta)
         if destination.exists():
-            require(hashlib.sha256(destination.read_bytes()).hexdigest() == digest,
+            with destination.open('rb') as stream:
+                existing_digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+            require(existing_digest == digest,
                     "This version already exists with different bytes; bump the creation version")
         else:
             archive.replace(destination)

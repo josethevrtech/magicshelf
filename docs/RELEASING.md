@@ -8,7 +8,7 @@
    advertised architecture. Test the
    actual installer, VR library, on/off controls, a new module, and a failed update.
 3. `bash build.sh` writes the verified framework archive, `catalog.json`,
-   `install-magicshelf.py`, `Install.MagicShelf.desktop`, and `SHA256SUMS` into `dist/`.
+   `install-magicshelf.py`, `Install.MagicShelf.desktop`, `framework.json`, and `SHA256SUMS` into `dist/`.
 4. Create a framework release using the
    matching `vVERSION` tag and attach all the generated assets. A draft release
    keeps the download links unavailable until the complete set is ready.
@@ -48,3 +48,13 @@ local unless their distribution is explicitly supported by their licenses.
 
 CI runs framework tests without a headset. A source build for a new architecture
 must not be advertised as supported until its runtime and installer are tested.
+
+The graphical desktop installer uses a checksum-pinned bootstrap and presents
+progress, retry and Open MagicShelf controls without opening a terminal. Publish
+all framework assets together before changing the public installer link. Future
+framework update checks read the latest release's `framework.json`.
+
+For creation releases, run the release workflow with the exact manifest version.
+It builds first, verifies that version, creates a draft, uploads the full asset set,
+and only then publishes it as latest. Keep distribution inputs pinned and record
+their authors and permission separately from the source-code license.

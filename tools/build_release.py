@@ -3,7 +3,7 @@
 import argparse, base64, hashlib, json, os, shutil, stat, tarfile, tempfile, zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent.parent
-VERSION='0.3.7'
+VERSION='0.3.9'
 REPO='josethevrtech/magicshelf'
 
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -48,9 +48,11 @@ except Exception as error:
     # Base64 is just argument quoting for Desktop Entry's Exec grammar.
     code="import base64;exec(base64.b64decode('"+base64.b64encode(launcher_source.encode()).decode()+"'))"
     escaped=code.replace('\\','\\\\').replace('"','\\"').replace('%','%%')
-    (out/'Install.MagicShelf.desktop').write_text('[Desktop Entry]\nType=Application\nName=Install MagicShelf\nComment=Install the MagicShelf shelf and module library\nExec=python3 -c "'+escaped+'"\nIcon=applications-games\nTerminal=true\nCategories=Game;\n')
+    (out/'Install.MagicShelf.desktop').write_text('[Desktop Entry]\nType=Application\nName=Install MagicShelf\nComment=Install the MagicShelf shelf and module library\nExec=python3 -c "'+escaped+'"\nIcon=applications-games\nTerminal=false\nCategories=Game;\n')
     (out/'Install.MagicShelf.desktop').chmod(0o755)
-    assets=[archive,out/'catalog.json',bootstrap,out/'Install.MagicShelf.desktop']
+    update={'schema_version':1,'version':VERSION,'artifacts':{arch:{'url':f'https://github.com/{REPO}/releases/download/v{VERSION}/{archive.name}','sha256':sha(archive),'size_bytes':archive.stat().st_size}}}
+    (out/'framework.json').write_text(json.dumps(update,indent=2)+'\n')
+    assets=[archive,out/'framework.json',out/'catalog.json',bootstrap,out/'Install.MagicShelf.desktop']
     (out/'SHA256SUMS').write_text(''.join(sha(p)+'  '+p.name+'\n' for p in sorted(assets)))
     print(json.dumps({'version':VERSION,'architecture':arch,'framework':str(archive),'desktop':str(out/'Install.MagicShelf.desktop')},indent=2))
 if __name__=='__main__':

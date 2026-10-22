@@ -168,7 +168,10 @@ class StorefrontTests(unittest.TestCase):
     def test_api_subscription_is_real_and_type_checked(self):
         self.release('1.0.0')
         with patch('magicshelf.manager.download',side_effect=self.download):
-            state=dispatch(self.manager,{'api_version':1,'method':'module.subscribe','params':{'id':self.key,'subscribed':True,'permissions':['vr-overlay']}})
+            dispatch(self.manager,{'api_version':1,'method':'module.subscribe','params':{'id':self.key,'subscribed':True,'permissions':['vr-overlay']}})
+            self.manager._install_thread.join(5)
+            self.assertFalse(self.manager._install_thread.is_alive())
+            state=self.manager.snapshot()
         self.assertTrue(state['modules'][0]['subscribed'])
         with self.assertRaises(ValueError):self.manager.subscribe(self.key,'yes',[])
 

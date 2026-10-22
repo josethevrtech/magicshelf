@@ -14,7 +14,8 @@ from . import VERSION
 from .contracts import ContractError, MAX_MODULES, catalog, load, machine, require, version
 from .packages import download, unpack
 from .storefront import decorate
-from . import preferences
+from . import preferences, setup
+from .framework_updates import FrameworkUpdates
 from .updates import Updates
 
 OFFICIAL = "https://raw.githubusercontent.com/josethevrtech/magicshelf/main/catalog.json"
@@ -101,12 +102,15 @@ class Manager(Updates):
         self._preview_lock = threading.Lock()
         self._request_lock = threading.Lock()
         self._check_thread = None
+        self._install_request_lock = threading.Lock()
+        self._install_thread = None
         self.checking = False
         self.catalog_errors = {}
         self.update_message = "Subscriptions check for updates automatically."
         self.message = "Ready"
         self.busy = (self.config / 'pending-install.json').exists()
         self.transfer = None
+        self.framework = FrameworkUpdates(self)
         self.publish()
 
     @contextlib.contextmanager
@@ -173,6 +177,7 @@ class Manager(Updates):
         atomic(self.sessionpath, self.sessions)
         self.ready.discard(key)
         env = {"MAGICSHELF_API_VERSION": str(meta["api_version"]), "MAGICSHELF_MODULE_ID": key, "MAGICSHELF_MODULE_KEY": "magicshelf.module." + key, "MAGICSHELF_SESSION": session, "MAGICSHELF_DATA_DIR": str(data), "MAGICSHELF_RUNTIME_DIR": str(self.runtime), "MAGICSHELF_LAYOUT_DIR": str(self.config), "MAGICSHELF_SHELF_OWNER": "0"}
+        env.update({'MAGICSHELF_STEAM_APP_'+str(appid)+'_DIR': str(path) for appid,path in setup.locations(meta,self.home).items()})
         if meta['api_version'] == 2:
             backend_data = self.root / 'runtime-data' / key
             cache = self.home / '.cache/magicshelf' / key
@@ -254,6 +259,11 @@ class Manager(Updates):
         require(type(enabled) is bool, "enabled must be true or false")
         require(key in self.state["modules"], "Creation is not installed")
         with self.transaction():
+            if enabled and not self.is_adapter(key) and not setup.status(self.metadata(key, self.state['modules'][key]), self.home)['ready']:
+                self.message = 'Choose Set up to finish preparing this creation.'
+                result = self.snapshot()
+                result['busy'] = False
+                return result
             recovered = False
             old = self.state["modules"][key]["enabled"]
             require(not enabled or old or sum(bool(i["enabled"]) for i in self.state["modules"].values()) < MAX_MODULES, "The shelf is full")
@@ -317,6 +327,8 @@ class Manager(Updates):
     def open(self, key):
         require(key in self.state['modules'], 'Creation is not installed')
         self.toggle(key, True)
+        if not self.state['modules'][key]['enabled']:
+            return self.snapshot()
         self.control(key, '--show')
         self.message = 'Opened ' + self.metadata(key, self.state['modules'][key])['name']
         return self.snapshot()
@@ -334,6 +346,28 @@ class Manager(Updates):
                 self.state["catalogs"].append(url)
                 self.save()
         return self.refresh()
+
+    def request_install(self, method, params):
+        # Large creation downloads must outlive an individual UI/RPC request.
+        if method == 'module.subscribe':
+            require(type(params.get('subscribed')) is bool, 'subscribed must be true or false')
+        require(isinstance(params.get('id'), str), 'Choose a creation first.')
+        with self._install_request_lock:
+            if self._install_thread and self._install_thread.is_alive():
+                return self.snapshot()
+            def run():
+                try:
+                    if method == 'module.subscribe':
+                        self.subscribe(params['id'], params['subscribed'], params.get('permissions'))
+                    else:
+                        self.install(params['id'], params.get('permissions'))
+                except Exception as error:
+                    from .updates import update_error
+                    self.message = update_error(error)
+                    self.publish()
+            self._install_thread = threading.Thread(target=run, daemon=True)
+            self._install_thread.start()
+        return self.snapshot()
 
     def install(self, key, permissions):
         with self.transaction():
@@ -594,6 +628,13 @@ class Manager(Updates):
             self.message = "Default settings restored." + (" Creations returned to the dock." if group != "app" else "")
         return self.snapshot()
 
+    def setup_step(self, key, appid):
+        require(key in self.state['modules'] and not self.is_adapter(key), 'Download this creation first.')
+        setup.open_step(self.metadata(key, self.state['modules'][key]), self.home, appid)
+        self.message = 'Finish the download in Steam, then return here. We will check when it is ready.'
+        self.publish()
+        return self.snapshot()
+
     def app_link(self, index):
         require(type(index) is int and 0 <= index < len(preferences.CREDITS), "Unknown app credit")
         subprocess.run(["xdg-open", preferences.CREDITS[index]["url"]], check=True, timeout=10, capture_output=True)
@@ -621,8 +662,10 @@ class Manager(Updates):
             item["subscribed"] = bool(sub)
             item["subscription_available"] = not self.is_adapter(item["id"]) and any(i["id"] == item["id"] for i in self.state["catalog"])
             item["update_mode"] = "local" if self.is_adapter(item["id"]) else "automatic" if sub else "manual"
+            item['setup'] = setup.status(item, self.home) if item.get('installed') else {'ready': True, 'steps': []}
+            item['needs_framework_update'] = version(item.get('minimum_framework_version', '0.0.0')) > version(VERSION)
             item["update_status"], item["update_note"] = self.update_status(item["id"], item)
-        return {"api_version": 1, "version": VERSION, "modules": modules, "catalogs": self.state["catalogs"], "preferences": preferences.snapshot(load(self.layoutpath)), "transfer": self.transfer, "busy": self.busy, "message": self.message, "update_message": self.update_message, "checking_updates": self.checking, "last_update_check": self.state.get("last_update_check"), "catalog_errors": self.catalog_errors}
+        return {"api_version": 1, "version": VERSION, "modules": modules, "catalogs": self.state["catalogs"], "preferences": preferences.snapshot(load(self.layoutpath)), "transfer": self.transfer, "busy": self.busy, "message": self.message, "update_message": self.update_message, "checking_updates": self.checking, "last_update_check": self.state.get("last_update_check"), "catalog_errors": self.catalog_errors, "framework_update": self.framework.snapshot()}
 
     def publish(self):
         atomic(self.runtime / "ui-state.json", self.snapshot())

@@ -22,20 +22,28 @@ def dispatch(manager, packet):
             raise ValueError("Invalid module session")
         manager.ready.add(key)
         return {"accepted": True}
+    if manager.framework.snapshot().get('stage') == 'installing' and method not in ('snapshot', 'modules.bootstrap'):
+        raise ValueError('MagicShelf is updating. It will reopen in a moment.')
+    def check_updates():
+        result = manager.request_update_check()
+        threading.Thread(target=manager.framework.check, daemon=True).start()
+        return result
     actions = {
         "snapshot": lambda: manager.snapshot(),
         "modules.adopt": lambda: manager.adopt(),
         "modules.bootstrap": lambda: manager.bootstrap(),
+        "framework.install": lambda: manager.framework.install(),
+        "module.setup": lambda: manager.setup_step(p["id"], p["appid"]),
         "module.open": lambda: manager.open(p["id"]),
         "module.toggle": lambda: manager.toggle(p["id"], p["enabled"]),
-        "module.subscribe": lambda: manager.subscribe(p["id"], p["subscribed"], p.get("permissions")),
+        "module.subscribe": lambda: manager.subscribe(p["id"], False) if p.get("subscribed") is False else manager.request_install(method, p),
         "module.link": lambda: manager.open_link(p["id"], p["index"]),
-        "module.install": lambda: manager.install(p["id"], p.get("permissions")),
+        "module.install": lambda: manager.request_install(method, p),
         "module.remove": lambda: manager.remove(p["id"]),
         "module.rollback": lambda: manager.rollback(p["id"]),
         "catalog.add": lambda: manager.add_catalog(p["url"]),
-        "catalog.refresh": lambda: manager.request_update_check(),
-        "subscriptions.sync": lambda: manager.request_update_check(),
+        "catalog.refresh": check_updates,
+        "subscriptions.sync": check_updates,
         "home": lambda: manager.home_all(),
         "settings.update": lambda: manager.update_settings(p.get("changes")),
         "settings.reset": lambda: manager.reset_settings(p.get("group")),
@@ -141,6 +149,7 @@ def serve():
                 print("MagicShelf state:", e, flush=True)
             time.sleep(1)
     threading.Thread(target=publish, daemon=True).start()
+    manager.framework.recover_after_restart()
     threading.Thread(target=manager.reconcile, daemon=True).start()
     def subscriptions():
         # No application scheduler or cron entry is needed: the installed manager
@@ -150,6 +159,7 @@ def serve():
             try:
                 if not manager.busy:
                     manager.sync_subscriptions()
+                    manager.framework.check()
             except Exception as error:
                 manager.update_message = "Automatic updates will retry: " + str(error)[:180]
             # Check promptly after a failed download or a temporary offline period.
