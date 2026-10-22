@@ -453,4 +453,46 @@ interrupted framework worker or device restart.
   interrupted-worker restoration, startup recovery and dashboard health failure.
   Native controls cover setup navigation and distinct update/retry actions.
 
-Public-release and live in-app update results are recorded below when completed.
+### Public releases and live update validation
+
+- All 102 Python checks pass locally and on Steam Frame. Native storefront checks
+  and the Frame GPU checks pass, including persistent texture uploads and 100
+  updates. GitHub's framework and both creation build checks passed.
+- MagicShelf 0.3.9 was published with its installer, desktop launcher, framework
+  manifest and checksums. The installed 0.3.8 build downloaded the public 0.3.9
+  archive, verified it, and applied it through the actual `framework.install` RPC
+  and independent worker. The new manager and native renderer became healthy,
+  the journal cleared, and the app reopened. SteamVR PID 2571, Phone PID 797771,
+  creation versions, On/Off states, subscriptions and shelf preferences were
+  unchanged. For this staged release check only, discovery used the versioned
+  public manifest while the release was marked prerelease. After promotion,
+  ordinary latest-release discovery reported 0.3.9 as up to date.
+- The published graphical installer was downloaded, checked against the desktop
+  launcher's pinned hash, and exercised through its installation function on the
+  Frame. Its real progress dialog and verified download/reinstall succeeded.
+  Both running creation PIDs and SteamVR's PID remained unchanged. This was an
+  idempotent reinstall on the prepared Frame, not a new device installation.
+- Android Phone (Virtual) 0.2.6 was released through its independent build workflow.
+  MagicShelf downloaded the public package while 0.2.5 stayed On with the same
+  PID. Turning it Off installed the verified cache. Turning it On started 0.2.6
+  successfully, with its Steam Android support detected as ready.
+- Smartphone Digivice 0.2.5 was released through its independent build workflow.
+  The complete 546,127,390-byte package downloaded through MagicShelf with measured
+  progress and installed automatically while Off. All eight recorded game-save
+  and settings file hashes were unchanged. On launch, the game ran from the
+  versioned package, the model resolved into that package, and the shell reported
+  a live game frame. The old manual input directory was not used by the new code.
+- With both creations Off, neither creation service nor any bundled game process
+  remained, and the Android container was stopped. Phone then resumed normally.
+  Final state restores Phone On and Digivice Off, with both subscriptions kept.
+  The manager, native dashboard and Phone service report zero automatic restarts.
+- Actual native captures show the public update and large download progress.
+  The native App settings view was rendered from live state, and the guided
+  setup view was separately rendered using an explicitly isolated empty-home
+  fixture. The fixture was never installed as the running app's state.
+
+The public installer is now 0.3.9. Public creation releases are Phone 0.2.6 and
+Smartphone Digivice 0.2.5. A separate first-time Frame installation, Steam's download
+confirmation dialogs on that device, and a physical reboot remain human beta
+checks; automated interruption recovery does not establish physical power-loss
+coverage.
