@@ -12,8 +12,6 @@ Built for **SteamOS and Steam Frame ONLY**.
 | **Artist credits** | **Shelf settings** |
 | ![Smartphone Digivice artist credits](https://github.com/user-attachments/assets/e0a8cbb0-e3cc-43d0-b6bf-f9601ec10187) | ![Shelf customization controls](https://github.com/user-attachments/assets/94353032-21fa-4667-8835-db186a7d807f) |
 
-The tour uses the native app renderer with current creation metadata. Install and download scenes are illustrative. Music: **Shelf Lights**, composed and synthesized for this tour without external samples. Digivice model: [Jojogape](https://x.com/jojogape); Digital Partner game: [Aludeku](https://aludeku.itch.io/digital-partner-digimon).
-
 ## Install
 
 In Desktop Mode, download [Install.MagicShelf.desktop](https://github.com/josethevrtech/magicshelf/releases/download/v0.1.3/Install.MagicShelf.desktop)
@@ -31,25 +29,6 @@ The first binary release targets **Steam Frame / Linux aarch64**, with Python
 This is an early framework release; the installation and migration validation
 is recorded in [docs/VALIDATION.md](docs/VALIDATION.md).
 
-## Published installer (0.1.3)
-
-- Turn a creation on to give it a shelf slot; turn it off to stop its module process.
-- Follow GitHub catalogs and review each creation before installing it.
-- Install and update creations independently. Failed readiness checks restore the
-  previous code and module data; **Restore previous** also supports manual recovery.
-- Remove a creation while keeping its saved data.
-
-**Pocket Clock** is an optional developer example, excluded from the default shelf.
-MagicShelf is the single dashboard entry; use **Open** in its library for either device.
-The existing Android phone and Digivice can be adopted on a migrated installation.
-Their switches hide/show the devices while keeping the shells and capture
-connections alive to preserve the Android session and pet. Local adapter
-capability v2 is required for this behavior. MagicShelf does not distribute
-the Android image, the Digital Partner game, or third-party Digivice artwork.
-
-The shelf appears beside Steam's launcher and hides while the launcher is closed
-or another dashboard app is active. Native expanded sidebar labels cover the
-shelf. Modules can implement their own pick-up and room behavior.
 
 ## A stable module contract
 
