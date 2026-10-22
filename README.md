@@ -29,35 +29,7 @@ The first binary release targets **Steam Frame / Linux aarch64**, with Python
 This is an early framework release; the installation and migration validation
 is recorded in [docs/VALIDATION.md](docs/VALIDATION.md).
 
-
-## A stable module contract
-
-API v1 defines the manifest, package format, environment, readiness message,
-shelf configuration, and home action. Unsupported API or schema versions are
-rejected before execution. Modules run in separate, memory-limited user services.
-See [the module contract](docs/MODULES.md) and the [Pocket Clock source](examples/pocket-clock).
-
-Permissions are declarations for review, not a complete security sandbox. Native
-creations run as your user and can access user resources. Only install modules from
-publishers you trust. Checksum verification detects changed downloads; it does
-not protect against a compromised publisher or catalog.
-
-## Develop
-
-```sh
-python3 -m unittest discover -s tests -v
-bash build.sh
-```
-
-Build requirements: C++17, pkg-config, Cairo, json-c, EGL/GLES development files,
-and the matching SteamVR `libopenvr_api.so`. The vendored OpenVR header is under
-Valve's BSD license; see [OPENVR-LICENSE.txt](OPENVR-LICENSE.txt).
-
-Release artifacts are written to `dist/`. Build on the target architecture.
-The build also creates a catalog, a `.magicshelf` module archive, a verified
-bootstrap installer, and the downloadable `.desktop` launcher.
-
-## Remove MagicShelf
+## Uninstall
 
 ```sh
 python3 ~/.local/share/magicshelf/current/uninstall.py
@@ -66,7 +38,3 @@ python3 ~/.local/share/magicshelf/current/uninstall.py
 This stops MagicShelf integration and downloaded modules and keeps releases and saved
 data. Migrated phone/Digivice shells return to their standalone shelf behavior.
 Existing game and Android installations remain in their original locations.
-
-MagicShelf code and Pocket Clock: MIT. OpenVR: Valve BSD 3-Clause. No affiliation
-with Valve, Steam, or Decky Loader. The desktop download flow follows the familiar
-[Decky installer pattern](https://github.com/SteamDeckHomebrew/decky-installer).
