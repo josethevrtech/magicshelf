@@ -62,14 +62,14 @@ def score(path):
         f.setnchannels(2);f.setsampwidth(2);f.setframerate(sr);f.writeframes((mix*32767).astype('<i2').tobytes())
 
 SCENES=[
- (0,4.8,'intro','MagicShelf','A home for my VR creations.','SteamOS + Steam Frame'),
- (4.8,10.8,'collection','Your creations.\nOne shelf.','Browse the collection.\nTurn creations on or off\nright from their cards.','01 / DISCOVER'),
- (10.8,16.8,'android-phone','Android,\nwithin reach.','Explore screenshots,\nread about a creation,\nand open its settings.','02 / EXPLORE'),
- (16.8,22.8,'artist-credits','Meet the\nmakers.','Find artist credits,\nproject links and\ncreator support pages.','03 / CREDITS'),
+ (0,4.8,'intro','MagicShelf','','SteamOS + Steam Frame'),
+ (4.8,10.8,'collection','Explore the\nCollection','Browse the collection.\nTurn creations on or off\nright from their cards.','01 / DISCOVER'),
+ (10.8,16.8,'android-phone','Creation\nDetails','Screenshots, settings,\nand project links\nfor each creation.','02 / EXPLORE'),
+ (16.8,22.8,'artist-credits','Credits &\nLinks','Find artist credits,\nproject links and\ncreator support pages.','03 / CREDITS'),
  (22.8,28.8,'permissions-example','Know what\nyou install.','Permissions explained\nin everyday language\nbefore you subscribe.','04 / INSTALL'),
  (28.8,34.8,'download','Subscribe.\nStay current.','Downloads install\nautomatically. Follow\nprogress as it happens.','05 / UPDATES'),
  (34.8,40.8,'shelf-settings','Make it\nyour own.','Adjust the shelf’s size,\nspacing and placement\nto fit your space.','06 / CUSTOMIZE'),
- (40.8,48,'outro','Make your shelf\nyour own.','github.com/josethevrtech/magicshelf','MAGICSHELF'),
+ (40.8,48,'outro','MagicShelf','github.com/josethevrtech/magicshelf','MAGICSHELF'),
 ]
 
 def main():
@@ -96,13 +96,15 @@ def main():
         c.stroke()
         text(72,66,'M / MAGIC SHELF',20,BLUE,True);text(1460,66,'STEAMOS + STEAM FRAME',18,MUTED)
         if name in ('intro','outro'):
-            px=850+12*math.sin(t*.2);py=225+8*math.cos(t*.25)
-            c.set_source_rgba(*BLUE,.2);rounded(px-2,py-2,1004,707,18);c.fill();c.save();rounded(px,py,1000,703,16);c.clip();picture('collection',px,py,1000,703);c.restore()
-            text(72,308,'NATIVE VR COLLECTION' if name=='intro' else 'YOUR NEXT CREATION STARTS HERE',19,BLUE,True)
-            text(68,435,title,99 if name=='intro' else 64,WHITE,True)
-            text(72,560 if name=='intro' else 655,body,25 if name=='intro' else 22,MUTED)
-            if name=='intro':text(72,633,'Browse. Subscribe. Make it yours.',23,WHITE)
-            else:text(72,720,'Explore the collection',24,BLUE)
+            px=(850 if name=='intro' else 980)+12*math.sin(t*.2)
+            py=(225 if name=='intro' else 180)+8*math.cos(t*.25)
+            pw=1000 if name=='intro' else 860;ph=pw*1800/2560
+            c.set_source_rgba(*BLUE,.2);rounded(px-2,py-2,pw+4,ph+4,18);c.fill();c.save();rounded(px,py,pw,ph,16);c.clip();picture('collection',px,py,pw,ph);c.restore()
+            text(68,435,title,99,WHITE,True)
+            if name=='outro':
+                c.set_source_rgba(*BLUE,.09);rounded(72,850,1776,112,18);c.fill_preserve()
+                c.set_source_rgba(*BLUE,.45);c.set_line_width(2);c.stroke()
+                text(108,923,body,54,BLUE,True)
         else:
             text(72,265,kicker,18,BLUE,True);text(68,366,title,56,WHITE,True);text(72,560,body,26,MUTED)
             # Small lateral entrance plus a subtle float, with no artificial UI chrome.
