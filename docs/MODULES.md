@@ -242,13 +242,19 @@ A creation may declare `minimum_framework_version` as a semantic version and
 `steam_requirements` as up to four objects with `appid`, a plain-language `title`,
 and `files` relative to a Steam library's `steamapps/common` directory. The host
 checks installed Steam manifests and required files without executing the creation.
-Missing requirements show **Set up** in place of On. The setup page opens Steam's
-normal installation flow and detects download progress and completion. Package
+Since 0.3.11, approved installation queues missing support downloads through the
+running Steam client's `+app_install` command. Setup stays inside MagicShelf,
+shows progress, resumes after restart, and reuses installed requirements. Package
 and catalog requirements must match exactly. The host passes each installed
 requirement directory as `MAGICSHELF_STEAM_APP_APPID_DIR` to support other libraries.
 
-`module.setup` accepts an installed creation `id` and one declared `appid`.
-A caller cannot use this endpoint to open arbitrary apps or commands. Creations
+`module.setup` accepts an installed creation `id` and queues all missing steps.
+An optional `appid` is validated against declared requirements for older clients.
+`module.setup.open` accepts `id` and a declared missing `appid` for the manual
+Steam fallback, shown only after automatic setup fails. The snapshot's setup
+stage is `idle`, `queued`, `running`, `failed`, or `ready`. Command dispatch never
+implies completion: Steam's installed manifest and required files must agree.
+A caller cannot use these endpoints to open arbitrary apps or commands. Creations
 own their requirements; MagicShelf does not hard-code Phone or Digivice setup.
 
 User-initiated `module.subscribe` and `module.install` requests now acknowledge a

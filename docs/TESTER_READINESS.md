@@ -1,8 +1,8 @@
 # Exclusive testing readiness
 
-MagicShelf 0.3.10 provides a graphical installer, guided creation setup and an
+MagicShelf 0.3.11 provides a graphical installer, automatic creation setup and an
 in-app framework updater for Steam Frame. Creations retain independent repositories
-and subscriptions. Every creation is available without payment or an account.
+and subscriptions. Creations require no payment or separate MagicShelf account.
 
 ## The tester experience
 
@@ -10,25 +10,28 @@ and subscriptions. Every creation is available without payment or an account.
    shows progress, verifies its download and offers **Open MagicShelf** when ready.
 2. Choose a creation, read its plain-language permissions and select
    **Subscribe & download**. Installation finishes automatically.
-3. If **Set up** appears, select it and choose **Continue in Steam** for the
-   missing support download. Finish Steam's normal dialog and return to MagicShelf.
-   The app detects download progress and completion; no folder selection or
-   terminal commands are needed.
+3. MagicShelf shows **Setting up** while Steam downloads any missing support
+   files in the background. Already installed support is reused. Existing
+   creations with incomplete setup have a **Set up** button to start this process.
 4. Turn the creation On. Configure, Off and the shelf controls remain on its page
    and collection card.
 5. Creation updates download in the background and install when that creation is
    Off. MagicShelf updates download separately and offer **Update and reopen**.
    A framework upgrade leaves running creations and SteamVR running.
 
-Android Phone (Virtual) 0.2.6 guides installation of Steam's Android support and
+Android Phone (Virtual) 0.2.6 declares Steam's Android support and
 prepares its private runtime safely. Smartphone Digivice 0.2.5 bundles its game
 and model with permission confirmed by the project owner; no import or model
-conversion is required. It guides installation of the two required Steam support
-packages. Steam may still require the user to confirm a download.
+conversion is required. MagicShelf installs its two required Steam support
+packages automatically through the running Steam client. If Steam cannot complete
+setup, the page offers **Retry** and an **Open Steam** fallback.
 
 ## Recovery behavior
 
 Downloads are bounded, checked and retried after temporary connection failures.
+Support setup runs without blocking browsing, persists across manager restarts,
+and retries temporary failures up to three times. Steam command acceptance alone
+never counts as success: installed state and required files must both be present.
 Creation updates preserve module data and recover interrupted installations.
 Restore previous holds the replaced version instead of immediately reinstalling
 it. A bad first start after an update installed while Off restores the previous
@@ -49,7 +52,7 @@ lifecycle behavior. See [VALIDATION.md](VALIDATION.md) for actual device results
 
 A prepared development Frame is not a factory-fresh device. Before expanding the
 invite group, have one tester complete installation and first launch on a separate
-supported Frame, including any Steam download prompts. Check opening both
+supported Frame with their own Steam account. Check automatic support downloads, opening both
 creations, Configure, grab/depth, returning to the dock, silence while Off and a
 normal reboot. Do not describe simulated recovery tests as physical power-loss or
 fresh-hardware testing.

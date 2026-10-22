@@ -33,7 +33,8 @@ def dispatch(manager, packet):
         "modules.adopt": lambda: manager.adopt(),
         "modules.bootstrap": lambda: manager.bootstrap(),
         "framework.install": lambda: manager.framework.install(),
-        "module.setup": lambda: manager.setup_step(p["id"], p["appid"]),
+        "module.setup": lambda: manager.setup_step(p["id"], p.get("appid")),
+        "module.setup.open": lambda: manager.setup_open(p["id"], p["appid"]),
         "module.open": lambda: manager.open(p["id"]),
         "module.toggle": lambda: manager.toggle(p["id"], p["enabled"]),
         "module.subscribe": lambda: manager.subscribe(p["id"], False) if p.get("subscribed") is False else manager.request_install(method, p),
@@ -144,6 +145,7 @@ def serve():
     def publish():
         while True:
             try:
+                manager.setup.tick()
                 manager.publish()
             except Exception as e:
                 print("MagicShelf state:", e, flush=True)

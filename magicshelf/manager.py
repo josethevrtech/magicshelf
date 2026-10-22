@@ -111,6 +111,7 @@ class Manager(Updates):
         self.busy = (self.config / 'pending-install.json').exists()
         self.transfer = None
         self.framework = FrameworkUpdates(self)
+        self.setup = setup.AutomaticSetup(self)
         self.publish()
 
     @contextlib.contextmanager
@@ -260,7 +261,8 @@ class Manager(Updates):
         require(key in self.state["modules"], "Creation is not installed")
         with self.transaction():
             if enabled and not self.is_adapter(key) and not setup.status(self.metadata(key, self.state['modules'][key]), self.home)['ready']:
-                self.message = 'Choose Set up to finish preparing this creation.'
+                self.setup.queue(key, retry=True)
+                self.message = 'Getting everything ready.'
                 result = self.snapshot()
                 result['busy'] = False
                 return result
@@ -452,6 +454,7 @@ class Manager(Updates):
             if enabled:
                 self.start(key)
             (self.config / 'pending-install.json').unlink()
+            self.setup.queue(key)
             self.message = "Installed " + self.metadata(key, self.state["modules"][key])["name"]
             return self.snapshot()
         except Exception:
@@ -628,11 +631,19 @@ class Manager(Updates):
             self.message = "Default settings restored." + (" Creations returned to the dock." if group != "app" else "")
         return self.snapshot()
 
-    def setup_step(self, key, appid):
+    def setup_step(self, key, appid=None):
+        require(key in self.state['modules'] and not self.is_adapter(key), 'Download this creation first.')
+        meta = self.metadata(key, self.state['modules'][key])
+        if appid is not None:
+            require(type(appid) is int and any(s['appid'] == appid for s in meta.get('steam_requirements', [])), 'Choose a setup step first.')
+        self.setup.queue(key, retry=True)
+        self.message = 'Getting everything ready.'
+        self.publish()
+        return self.snapshot()
+
+    def setup_open(self, key, appid):
         require(key in self.state['modules'] and not self.is_adapter(key), 'Download this creation first.')
         setup.open_step(self.metadata(key, self.state['modules'][key]), self.home, appid)
-        self.message = 'Setup opened in Steam.'
-        self.publish()
         return self.snapshot()
 
     def app_link(self, index):
@@ -662,10 +673,21 @@ class Manager(Updates):
             item["subscribed"] = bool(sub)
             item["subscription_available"] = not self.is_adapter(item["id"]) and any(i["id"] == item["id"] for i in self.state["catalog"])
             item["update_mode"] = "local" if self.is_adapter(item["id"]) else "automatic" if sub else "manual"
-            item['setup'] = setup.status(item, self.home) if item.get('installed') else {'ready': True, 'steps': []}
+            item['setup'] = self.setup.snapshot(item) if item.get('installed') else {'ready': True, 'steps': []}
             item['needs_framework_update'] = version(item.get('minimum_framework_version', '0.0.0')) > version(VERSION)
             item["update_status"], item["update_note"] = self.update_status(item["id"], item)
-        return {"api_version": 1, "version": VERSION, "modules": modules, "catalogs": self.state["catalogs"], "preferences": preferences.snapshot(load(self.layoutpath)), "transfer": self.transfer, "busy": self.busy, "message": self.message, "update_message": self.update_message, "checking_updates": self.checking, "last_update_check": self.state.get("last_update_check"), "catalog_errors": self.catalog_errors, "framework_update": self.framework.snapshot()}
+        transfer = self.transfer
+        if not transfer or not transfer.get('active'):
+            preparing = next((m for m in modules if m['setup'].get('stage') in ('queued', 'running')), None)
+            if preparing:
+                step = next((s for s in preparing['setup']['steps'] if not s['ready']), {})
+                transfer = {'id': preparing['id'], 'name': preparing['name'], 'stage': 'setting_up', 'active': True,
+                            'received_bytes': step.get('received_bytes', 0), 'total_bytes': step.get('total_bytes', 0)}
+            elif transfer:
+                item = next((m for m in modules if m['id'] == transfer.get('id')), None)
+                if item and item['setup'].get('stage') == 'failed':
+                    transfer = {**transfer, 'stage': 'setup_failed'}
+        return {"api_version": 1, "version": VERSION, "modules": modules, "catalogs": self.state["catalogs"], "preferences": preferences.snapshot(load(self.layoutpath)), "transfer": transfer, "busy": self.busy, "message": self.message, "update_message": self.update_message, "checking_updates": self.checking, "last_update_check": self.state.get("last_update_check"), "catalog_errors": self.catalog_errors, "framework_update": self.framework.snapshot()}
 
     def publish(self):
         atomic(self.runtime / "ui-state.json", self.snapshot())

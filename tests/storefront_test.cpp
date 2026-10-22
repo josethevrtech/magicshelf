@@ -36,12 +36,14 @@ ui.selected.clear();check(ui,c,state);bool setupFound=false;for(auto b:ui.button
 int setupActions=0;
 for(auto b:ui.buttons){
  assert(b.method!="ui.setup"&&b.method!="ui.settings"&&b.method!="module.toggle"&&b.method.rfind("ui.tab.",0)!=0&&b.method.rfind("ui.photo-",0)!=0);
- if(b.method=="module.setup"){setupActions++;assert(ui.local(b,state,method,params));auto*p=json_tokener_parse(params.c_str());assert(json_object_get_int(field(p,"appid"))==123);json_object_put(p);}
+ if(b.method=="module.setup"){setupActions++;assert(ui.local(b,state,method,params));auto*p=json_tokener_parse(params.c_str());assert(textfield(p,"id")==ui.selected);json_object_put(p);}
 }
 assert(setupActions==1);
 // Finishing one dependency advances the same action; completion restores controls.
 auto*setup=field(download,"setup");auto*steps=field(setup,"steps");json_object_object_add(json_object_array_get_idx(steps,0),"ready",json_object_new_boolean(true));json_object_array_add(steps,json_tokener_parse(R"({"appid":456,"ready":false})"));check(ui,c,state);
-setupActions=0;for(auto b:ui.buttons)if(b.method=="module.setup"){setupActions++;auto*p=json_tokener_parse(b.params.c_str());assert(json_object_get_int(field(p,"appid"))==456);json_object_put(p);}assert(setupActions==1);
+setupActions=0;for(auto b:ui.buttons)if(b.method=="module.setup")setupActions++;assert(setupActions==1);
+json_object_object_add(setup,"stage",json_object_new_string("running"));check(ui,c,state);for(auto b:ui.buttons)assert(b.method!="module.setup"&&b.method!="module.setup.open");
+json_object_object_add(setup,"stage",json_object_new_string("failed"));check(ui,c,state);bool fallback=false,retry=false;for(auto b:ui.buttons){retry|=b.method=="module.setup";if(b.method=="module.setup.open"){fallback=true;auto*p=json_tokener_parse(b.params.c_str());assert(json_object_get_int(field(p,"appid"))==456);json_object_put(p);}}assert(fallback&&retry);
 json_object_object_add(setup,"ready",json_object_new_boolean(true));check(ui,c,state);bool powerRestored=false;for(auto b:ui.buttons){assert(b.method!="module.setup");powerRestored|=b.method=="module.toggle";}assert(powerRestored);
 json_object_object_del(download,"setup");
 ui.selected.clear();auto*list=field(state,"modules");for(int i=0;i<9;i++){auto*m=json_tokener_parse(R"({"name":"A very long creation name to check clipping","description":"Long descriptions remain inside their own creation card and never cover another card's controls.","category":"Creations","installed":true})");json_object_object_add(m,"id",json_object_new_string(("org.test.extra"+std::to_string(i)).c_str()));json_object_array_add(list,m);}for(auto v:{"discover","library"}){ui.view=v;for(int page=0;page<4;page++){ui.page=page;check(ui,c,state);}}
