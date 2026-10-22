@@ -41,14 +41,14 @@ struct StoreUI{
  void wrap(Canvas&c,int x,int y,int width,const std::string&s,int size,int lines=4,bool muted=true){std::istringstream words(s);std::string word,line;int n=0;cairo_set_font_size(c.c,size);while(words>>word){auto next=line.empty()?word:line+" "+word;cairo_text_extents_t e{};cairo_text_extents(c.c,next.c_str(),&e);if(e.x_advance>width&&!line.empty()){text(c,x,y+n*(size+9),line,size,muted,width);line=word;if(++n>=lines)return;}else line=next;}if(!line.empty()&&n<lines)text(c,x,y+n*(size+9),line,size,muted,width);}
  void button(Canvas&c,int x,int y,int w,const std::string&label,const std::string&method,const std::string&params="{}",bool primary=false,int h=48){round(c,x,y,w,h,9,primary?.36:.035,primary?.66:.065,primary?1.0:.11);if(primary){cairo_save(c.c);cairo_rectangle(c.c,x+14,y+8,w-28,h-10);cairo_clip(c.c);c.text(x+16,y+h/2+7,label,19,.015,.035,.07);cairo_restore(c.c);}else text(c,x+16,y+h/2+7,label,19,false,w-28);buttons.push_back({x,y,w,h,method,params});feedback(c,x,y,w,h,method,params);}
  void art(Canvas&c,json_object*m,int x,int y,int w,int h,int index=0){round(c,x,y,w,h,14,.018,.032,.055);auto*pics=field(m,"screenshots");int n=pics?json_object_array_length(pics):0;if(!n){text(c,x+w/2-20,y+h/2+18,"M",56);return;}auto*p=json_object_array_get_idx(pics,index%n);auto path=textfield(p,"path");auto*s=image(path);if(cairo_surface_status(s)==CAIRO_STATUS_SUCCESS){int iw=cairo_image_surface_get_width(s),ih=cairo_image_surface_get_height(s);double scale=std::min(double(w)/iw,double(h-12)/ih);cairo_save(c.c);cairo_translate(c.c,x+(w-iw*scale)/2,y+(h-ih*scale)/2);cairo_scale(c.c,scale,scale);cairo_set_source_surface(c.c,s,0,0);cairo_paint(c.c);cairo_restore(c.c);}else text(c,x+30,y+70,"Preview unavailable",20,true,w-60);}
- std::string transferLabel(json_object*t){auto stage=textfield(t,"stage");return stage=="downloading"?"Downloading":stage=="checking"?"Checking download":stage=="installing"?"Installing":stage=="ready"?"Ready when Off":stage=="complete"?"Installed · Ready":"Download needs retry";}
+ std::string transferLabel(json_object*t){auto stage=textfield(t,"stage");return stage=="downloading"?"Downloading":stage=="checking"?"Checking download":stage=="installing"?"Installing":stage=="ready"?"Ready when Off":stage=="complete"?"Installed · Ready":stage=="setting_up"?"Setting up":stage=="setup_failed"?"Setup needs retry":"Download needs retry";}
  std::string updateLabel(json_object*m){auto status=textfield(m,"update_status");return status=="ready"?"Update ready":status=="review"?"Review update":status=="failed"?"Update needs retry":status=="held"?"Previous version kept":status=="available"?"Update available":"Installed";}
  double fraction(json_object*t){double total=json_object_get_double(field(t,"total_bytes"));return total>0?std::clamp(json_object_get_double(field(t,"received_bytes"))/total,0.,1.):0.;}
  void progressBar(Canvas&c,json_object*t,int x,int y,int width){
   round(c,x,y,width,7,3,.06,.12,.20);double fill=width*fraction(t);if(fill>0)c.rect(x,y,std::max(1,int(fill)),7,.36,.66,1.0);
  }
  void power(Canvas&c,json_object*m,int x,int y){
-  if(auto*setup=field(m,"setup");setup&&!boolfield(setup,"ready")){button(c,x,y,116,"Set up","ui.setup",argsFor(textfield(m,"id")),true);return;}
+  if(auto*setup=field(m,"setup");setup&&!boolfield(setup,"ready")){button(c,x,y,116,(textfield(setup,"stage")=="queued"||textfield(setup,"stage")=="running")?"View setup":"Set up","ui.setup",argsFor(textfield(m,"id")),true);return;}
   bool on=boolfield(m,"enabled");auto params=argsFor(textfield(m,"id"),"enabled",json_object_new_boolean(!on));
   text(c,x+6,y+31,on?"On":"Off",18,false,40);
   round(c,x+58,y+10,52,28,14,on?.36:.12,on?.66:.18,on?1.0:.26);
@@ -62,10 +62,10 @@ struct StoreUI{
   button(c,20,199,180,"My Shelf","ui.library","{}",view=="library");
   button(c,20,257,180,"Settings","ui.preferences","{}",view=="settings");
   if(textfield(field(state,"framework_update"),"stage")=="ready")button(c,20,475,182,"App update ready","ui.appupdates");
-  if(auto*t=field(state,"transfer")){
+  if(auto*t=field(state,"transfer");t&&!setupFocused(find(state,selected))){
    text(c,27,587,"DOWNLOADS",13,true,170);wrap(c,27,618,168,textfield(t,"name"),18,2,false);
    wrap(c,27,684,174,transferLabel(t),16,2);progressBar(c,t,27,723,168);
-   if(textfield(t,"stage")=="downloading"){
+   if(textfield(t,"stage")=="downloading"||(textfield(t,"stage")=="setting_up"&&json_object_get_double(field(t,"total_bytes"))>0)){
     char amount[70];snprintf(amount,sizeof(amount),"%.1f / %.1f MB · %.0f%%",json_object_get_double(field(t,"received_bytes"))/1048576.,json_object_get_double(field(t,"total_bytes"))/1048576.,std::floor(fraction(t)*100));text(c,27,753,amount,12,true,172);
    }
   }
@@ -96,7 +96,7 @@ struct StoreUI{
    auto params=argsFor(textfield(m,"id"));buttons.push_back({x,y,484,cardH-72,"ui.detail",params});feedback(c,x,y,484,cardH-72,"ui.detail",params);
    auto*t=field(state,"transfer");bool active=boolfield(t,"active")&&textfield(t,"id")==textfield(m,"id");int footer=y+cardH-60;
    if(active){text(c,x+21,footer+23,transferLabel(t),18,false,442);progressBar(c,t,x+21,footer+36,442);}
-   else if(boolfield(m,"installed")){text(c,x+21,footer+30,field(m,"setup")&&!boolfield(field(m,"setup"),"ready")?"Setup needed":updateLabel(m),17,true,300);power(c,m,x+347,footer);}
+   else if(boolfield(m,"installed")){text(c,x+21,footer+30,field(m,"setup")&&!boolfield(field(m,"setup"),"ready")?(textfield(field(m,"setup"),"stage")=="queued"||textfield(field(m,"setup"),"stage")=="running"?"Setting up":"Setup needed"):updateLabel(m),17,true,300);power(c,m,x+347,footer);}
    else button(c,x+21,footer,442,"View creation >","ui.detail",params);
   }
   if(!count){text(c,280,375,"Your shelf starts here.",30);wrap(c,280,420,820,"Explore Discover and subscribe to a creation you like.",22,3);}
@@ -165,11 +165,14 @@ struct StoreUI{
   for(;index<total;index++){auto*s=json_object_array_get_idx(steps,index);if(!boolfield(s,"ready")){next=s;break;}}
   if(!next)return;
   if(total>1)text(c,738,338,"Step "+std::to_string(index+1)+" of "+std::to_string(total),15,true,510);
+  auto*setup=field(m,"setup");auto stage=textfield(setup,"stage");bool active=stage=="queued"||stage=="running",failed=stage=="failed";
   bool downloading=json_object_get_double(field(next,"total_bytes"))>0;
-  text(c,738,410,downloading?"Setting up":"Finish setup",28);
-  if(downloading){progressBar(c,next,738,448,440);text(c,738,486,std::to_string(int(std::floor(fraction(next)*100)))+"%",17,true,510);}
-  else text(c,738,450,"Steam will download the remaining files.",18,true,510);
-  button(c,738,514,278,downloading?"Open Steam":"Continue in Steam","module.setup",argsFor(textfield(m,"id"),"appid",json_object_new_int(json_object_get_int(field(next,"appid")))),true);
+  text(c,738,410,failed?"Setup paused":active?"Setting up":"Finish setup",28);
+  if(failed)wrap(c,738,450,510,textfield(setup,"error"),18,2);
+  else if(downloading){progressBar(c,next,738,448,440);text(c,738,486,fraction(next)>=1?"Finishing up...":std::to_string(int(std::floor(fraction(next)*100)))+"%",17,true,510);}
+  else text(c,738,450,active?"Getting everything ready.":"MagicShelf will handle the downloads.",18,true,510);
+  if(!active)button(c,738,514,230,failed?"Retry":"Set up","module.setup",argsFor(textfield(m,"id")),true);
+  if(failed)button(c,986,514,258,"Open Steam","module.setup.open",argsFor(textfield(m,"id"),"appid",json_object_new_int(json_object_get_int(field(next,"appid")))));
  }
  void detail(Canvas&c,json_object*m,json_object*state){if(setupFocused(m)){setupPage(c,m);return;}auto id=textfield(m,"id");button(c,254,112,163,"< Collection","ui.back");
   art(c,m,254,183,450,534,gallery);auto*pics=field(m,"screenshots");int n=pics?json_object_array_length(pics):0;if(n){auto*p=json_object_array_get_idx(pics,gallery%n);wrap(c,266,749,428,textfield(p,"caption"),16,2);if(n>1){button(c,254,790,150,"< Previous","ui.photo-prev");button(c,554,790,150,"Next >","ui.photo-next");text(c,452,820,std::to_string(gallery%n+1)+" / "+std::to_string(n),17,true);}}
@@ -225,7 +228,7 @@ struct StoreUI{
  bool local(const StoreButton&b,json_object*state,std::string&method,std::string&params){auto*arg=json_tokener_parse(b.params.c_str());std::string id=textfield(arg,"id");if(arg)json_object_put(arg);
   if(b.method=="ui.discover"||b.method=="ui.library"||b.method=="ui.preferences"){view=b.method=="ui.discover"?"discover":b.method=="ui.library"?"library":"settings";selected.clear();reviewId.clear();page=0;}
   else if(b.method.rfind("ui.pref.",0)==0)settingsTab=b.method.substr(8);
-  else if(b.method=="ui.detail"){selected=id;tab="about";gallery=0;creditPage=0;linkPage=0;}
+  else if(b.method=="ui.detail"){selected=id;auto*m=find(state,id);tab=boolfield(m,"installed")&&field(m,"setup")&&!boolfield(field(m,"setup"),"ready")?"settings":"about";gallery=0;creditPage=0;linkPage=0;}
   else if(b.method=="ui.back")selected.clear();else if(b.method=="ui.settings")tab="settings";
   else if(b.method=="ui.setup"){selected=id;tab="settings";reviewId.clear();}
   else if(b.method=="ui.appupdates"){selected.clear();reviewId.clear();view="settings";settingsTab="app";}

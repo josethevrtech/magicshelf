@@ -6,13 +6,13 @@ let snapshot = null, view = 'discover', selected = null, tab = 'about', category
 function el(tag, text, cls) { const n = document.createElement(tag); if (text) n.textContent = text; if (cls) n.className = cls; return n; }
 function button(text, cls, fn) { const b = el('button', text, cls); b.type = 'button'; b.onclick = fn; b.disabled = working || Boolean(snapshot?.busy); return b; }
 function link(text, url, cls = 'project-link') { const a = el('a', text, cls); try { if (new URL(url).protocol !== 'https:') return el('span', text); } catch { return el('span', text); } a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; return a; }
-function transferLabel(t) { return ({downloading:'Downloading',checking:'Checking download',installing:'Installing',ready:'Ready when Off',complete:'Installed · Ready',failed:'Download needs retry'})[t.stage] || ''; }
-function progress(t) { const box=el('div',null,'download-progress');box.append(el('strong',transferLabel(t)));const bar=el('progress');bar.max=t.total_bytes;bar.value=t.received_bytes;bar.setAttribute('aria-label','Download progress for '+t.name);box.append(bar);if(t.stage==='downloading')box.append(el('small',(t.received_bytes/1048576).toFixed(1)+' / '+(t.total_bytes/1048576).toFixed(1)+' MB · '+Math.floor(t.received_bytes/t.total_bytes*100)+'%'));return box; }
-function power(item) { if(item.setup&&!item.setup.ready)return button('Set up','primary',()=>{selected=item.id;tab='settings';render();});const b=button('','power-toggle',()=>act('module.toggle',{id:item.id,enabled:!item.enabled}));b.append(el('span',item.enabled?'On':'Off'),el('span',null,'power-track'));b.setAttribute('role','switch');b.setAttribute('aria-checked',String(item.enabled));b.setAttribute('aria-label','Turn '+item.name+' on or off');b.lastChild.setAttribute('aria-hidden','true');return b; }
+function transferLabel(t) { return ({downloading:'Downloading',checking:'Checking download',installing:'Installing',ready:'Ready when Off',complete:'Installed · Ready',setting_up:'Setting up',setup_failed:'Setup needs retry',failed:'Download needs retry'})[t.stage] || ''; }
+function progress(t) { const box=el('div',null,'download-progress');box.append(el('strong',transferLabel(t)));const bar=el('progress');bar.max=t.total_bytes;bar.value=t.received_bytes;bar.setAttribute('aria-label','Download progress for '+t.name);box.append(bar);if((t.stage==='downloading'||t.stage==='setting_up')&&t.total_bytes>0)box.append(el('small',(t.received_bytes/1048576).toFixed(1)+' / '+(t.total_bytes/1048576).toFixed(1)+' MB · '+Math.floor(t.received_bytes/t.total_bytes*100)+'%'));return box; }
+function power(item) { if(item.setup&&!item.setup.ready)return button(['queued','running'].includes(item.setup.stage)?'View setup':'Set up','primary',()=>{selected=item.id;tab='settings';render();});const b=button('','power-toggle',()=>act('module.toggle',{id:item.id,enabled:!item.enabled}));b.append(el('span',item.enabled?'On':'Off'),el('span',null,'power-track'));b.setAttribute('role','switch');b.setAttribute('aria-checked',String(item.enabled));b.setAttribute('aria-label','Turn '+item.name+' on or off');b.lastChild.setAttribute('aria-hidden','true');return b; }
 async function api(method, params = {}) { const r = await fetch('/api', { method: 'POST', headers: {'Content-Type':'application/json','Authorization':'Bearer ' + token}, body: JSON.stringify({api_version:1,method,params}) }); if (!r.ok) throw Error('Open MagicShelf from its desktop shortcut to reconnect.'); const data = await r.json(); if (data.error) throw Error(data.error); return data.result; }
 async function act(method, params = {}) { if (working) return; working = true; actionError = ''; render(); $('notice').textContent = method === 'module.subscribe' ? 'Downloading your creation…' : 'Updating your shelf…'; try { snapshot = await api(method, params); } catch (e) { actionError = e.message; } finally { working = false; render(); } }
 function choose(next) { view = next; selected = null; category = 'All'; query = ''; render(); window.scrollTo(0,0); }
-function openCreation(id) { selected = id; tab = 'about'; gallery = 0; render(); window.scrollTo(0,0); }
+function openCreation(id) { selected = id; const item=snapshot.modules.find(m=>m.id===id); tab = item?.installed&&item.setup&&!item.setup.ready?'settings':'about'; gallery = 0; render(); window.scrollTo(0,0); }
 function review(item, method = 'module.subscribe') {
   const target = item.update || item;
   $('review-title').textContent = (item.installed && item.update ? 'Update ' : 'Subscribe to ') + item.name;
@@ -43,7 +43,7 @@ function renderCards() {
     info.append(el('div',item.category,'card-category'),el('h3',item.name),el('p',item.description));open.append(artwork(item,'card-art'),info);card.append(open);
     const foot=el('div',null,'card-foot'),t=snapshot.transfer;
     if(t?.active&&t.id===item.id)foot.append(progress(t));
-    else if(item.installed)foot.append(el('span',({ready:'Update ready',review:'Review update',failed:'Update needs retry',held:'Previous version kept',available:'Update available'})[item.update_status]||'Installed'),power(item));
+    else if(item.installed)foot.append(el('span',({ready:'Update ready',review:'Review update',failed:'Update needs retry',held:'Previous version kept',available:'Update available'})[item.update_status]||(item.setup&&!item.setup.ready?(['queued','running'].includes(item.setup.stage)?'Setting up':'Setup needed'):'Installed')),power(item));
     else foot.append(button('View creation ↗','secondary',()=>openCreation(item.id)));
     card.append(foot);cards.append(card);
   }
@@ -66,10 +66,14 @@ function setupPage(item){
   const steps=item.setup.steps,index=steps.findIndex(s=>!s.ready),next=steps[index];
   if(next){
     if(steps.length>1)right.append(el('p','Step '+(index+1)+' of '+steps.length,'setup-step'));
-    const content=el('div',null,'setup-content'),downloading=next.total_bytes>0;content.append(el('h2',downloading?'Setting up':'Finish setup'));
-    if(downloading){const bar=el('progress');bar.max=next.total_bytes;bar.value=next.received_bytes;bar.setAttribute('aria-label','Setup download progress');content.append(bar,el('p',Math.floor(Math.min(1,next.received_bytes/next.total_bytes)*100)+'%','setup-copy'));}
-    else content.append(el('p','Steam will download the remaining files.','setup-copy'));
-    content.append(button(downloading?'Open Steam':'Continue in Steam','primary',()=>act('module.setup',{id:item.id,appid:next.appid})));right.append(content);
+    const active=['queued','running'].includes(item.setup.stage),failed=item.setup.stage==='failed',downloading=next.total_bytes>0;
+    const content=el('div',null,'setup-content');content.append(el('h2',failed?'Setup paused':active?'Setting up':'Finish setup'));
+    if(failed)content.append(el('p',item.setup.error,'setup-copy'));
+    else if(downloading){const bar=el('progress');bar.max=next.total_bytes;bar.value=next.received_bytes;bar.setAttribute('aria-label','Setup download progress');content.append(bar,el('p',next.received_bytes>=next.total_bytes?'Finishing up…':Math.floor(Math.min(1,next.received_bytes/next.total_bytes)*100)+'%','setup-copy'));}
+    else content.append(el('p',active?'Getting everything ready.':'MagicShelf will handle the downloads.','setup-copy'));
+    if(!active)content.append(button(failed?'Retry':'Set up','primary',()=>act('module.setup',{id:item.id})));
+    if(failed)content.append(button('Open Steam','secondary',()=>act('module.setup.open',{id:item.id,appid:next.appid})));
+    right.append(content);
   }
   section.append(grid);return section;
 }
