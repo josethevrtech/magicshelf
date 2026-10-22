@@ -111,7 +111,7 @@ void dashboard(){
 }
 
 int main(int argc,char**argv){try{
- if(argc==3&&std::string(argv[1])=="--icon"){Canvas icon(128,128);icon.fill(0,0,0);icon.rect(23,37,82,65,.36,.66,1.0);icon.rect(30,44,68,51,0,0,0);icon.rect(18,27,92,10,.36,.66,1.0);icon.text(35,82,"M",39);icon.png(argv[2]);return 0;}
+ if(argc==3&&std::string(argv[1])=="--icon"){Canvas icon(128,128);ShelfTheme::logo(icon,0,0,128);icon.png(argv[2]);return 0;}
  if(argc>=4&&std::string(argv[1])=="--preview"){auto*j=json_object_from_file(argv[2]);if(!j)throw std::runtime_error("Cannot read preview state");Canvas c(StoreUI::W*RenderScale,StoreUI::H*RenderScale);cairo_scale(c.c,RenderScale,RenderScale);StoreUI ui;if(argc>4)ui.selected=argv[4];if(argc>5)ui.tab=argv[5];ui.draw(c,j,false,"Ready");c.png(argv[3]);json_object_put(j);return 0;}
  std::signal(SIGTERM,stop);std::signal(SIGINT,stop);std::signal(SIGPIPE,SIG_IGN);
  bool command=argc==2;vr::EVRInitError error;vr::VR_Init(&error,command?vr::VRApplication_Background:vr::VRApplication_Overlay);
