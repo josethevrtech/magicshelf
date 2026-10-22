@@ -1,5 +1,5 @@
 #pragma once
-#include "compat/render.h"
+#include "storefront_theme.h"
 #include <json-c/json.h>
 #include <sstream>
 #include <filesystem>
@@ -31,33 +31,33 @@ struct StoreUI{
   bool available=!working||(method.rfind("ui.",0)==0&&method!="ui.confirm");
   if(!available){cairo_save(c.c);cairo_set_source_rgba(c.c,0,0,0,.42);cairo_rectangle(c.c,x,y,w,h);cairo_fill(c.c);cairo_restore(c.c);return;}
   if(hover!=id)return;
-  cairo_save(c.c);cairo_set_source_rgba(c.c,.36,.66,1.0,pressed==id?.19:.08);cairo_rectangle(c.c,x+2,y+2,w-4,h-4);cairo_fill(c.c);
-  cairo_set_source_rgb(c.c,.36,.66,1.0);cairo_set_line_width(c.c,pressed==id?3:2);cairo_rectangle(c.c,x+2,y+2,w-4,h-4);cairo_stroke(c.c);cairo_restore(c.c);
+  cairo_save(c.c);ShelfTheme::source(c,ShelfTheme::accent,pressed==id?.19:.08);cairo_rectangle(c.c,x+2,y+2,w-4,h-4);cairo_fill(c.c);
+  ShelfTheme::source(c,ShelfTheme::accent);cairo_set_line_width(c.c,pressed==id?3:2);cairo_rectangle(c.c,x+2,y+2,w-4,h-4);cairo_stroke(c.c);cairo_restore(c.c);
  }
  std::string key()const{return view+selected+tab+settingsTab+reviewId+reviewMethod+std::to_string(page)+":"+std::to_string(gallery)+":"+std::to_string(creditPage)+":"+std::to_string(linkPage);}
  json_object* find(json_object*state,const std::string&id){auto*a=field(state,"modules");for(size_t i=0;a&&i<json_object_array_length(a);i++){auto*m=json_object_array_get_idx(a,i);if(textfield(m,"id")==id)return m;}return nullptr;}
- void round(Canvas&c,double x,double y,double w,double h,double r,double red,double green,double blue){cairo_new_sub_path(c.c);cairo_arc(c.c,x+w-r,y+r,r,-M_PI/2,0);cairo_arc(c.c,x+w-r,y+h-r,r,0,M_PI/2);cairo_arc(c.c,x+r,y+h-r,r,M_PI/2,M_PI);cairo_arc(c.c,x+r,y+r,r,M_PI,3*M_PI/2);cairo_close_path(c.c);cairo_set_source_rgb(c.c,red,green,blue);cairo_fill(c.c);}
- void text(Canvas&c,int x,int y,const std::string&s,int size=20,bool muted=false,int width=1000){cairo_save(c.c);cairo_rectangle(c.c,x,y-size,width,size+9);cairo_clip(c.c);c.text(x,y,s,size,muted?.57:.95,muted?.65:.97,muted?.76:1.0);cairo_restore(c.c);}
+ void round(Canvas&c,double x,double y,double w,double h,double r,ShelfTheme::Color color){cairo_new_sub_path(c.c);cairo_arc(c.c,x+w-r,y+r,r,-M_PI/2,0);cairo_arc(c.c,x+w-r,y+h-r,r,0,M_PI/2);cairo_arc(c.c,x+r,y+h-r,r,M_PI/2,M_PI);cairo_arc(c.c,x+r,y+r,r,M_PI,3*M_PI/2);cairo_close_path(c.c);ShelfTheme::source(c,color);cairo_fill(c.c);}
+ void text(Canvas&c,int x,int y,const std::string&s,int size=20,bool muted=false,int width=1000){cairo_save(c.c);cairo_rectangle(c.c,x,y-size,width,size+9);cairo_clip(c.c);auto color=muted?ShelfTheme::muted:ShelfTheme::text;c.text(x,y,s,size,color.r,color.g,color.b);cairo_restore(c.c);}
  void wrap(Canvas&c,int x,int y,int width,const std::string&s,int size,int lines=4,bool muted=true){std::istringstream words(s);std::string word,line;int n=0;cairo_set_font_size(c.c,size);while(words>>word){auto next=line.empty()?word:line+" "+word;cairo_text_extents_t e{};cairo_text_extents(c.c,next.c_str(),&e);if(e.x_advance>width&&!line.empty()){text(c,x,y+n*(size+9),line,size,muted,width);line=word;if(++n>=lines)return;}else line=next;}if(!line.empty()&&n<lines)text(c,x,y+n*(size+9),line,size,muted,width);}
- void button(Canvas&c,int x,int y,int w,const std::string&label,const std::string&method,const std::string&params="{}",bool primary=false,int h=48){round(c,x,y,w,h,9,primary?.36:.035,primary?.66:.065,primary?1.0:.11);if(primary){cairo_save(c.c);cairo_rectangle(c.c,x+14,y+8,w-28,h-10);cairo_clip(c.c);c.text(x+16,y+h/2+7,label,19,.015,.035,.07);cairo_restore(c.c);}else text(c,x+16,y+h/2+7,label,19,false,w-28);buttons.push_back({x,y,w,h,method,params});feedback(c,x,y,w,h,method,params);}
- void art(Canvas&c,json_object*m,int x,int y,int w,int h,int index=0){round(c,x,y,w,h,14,.018,.032,.055);auto*pics=field(m,"screenshots");int n=pics?json_object_array_length(pics):0;if(!n){text(c,x+w/2-20,y+h/2+18,"M",56);return;}auto*p=json_object_array_get_idx(pics,index%n);auto path=textfield(p,"path");auto*s=image(path);if(cairo_surface_status(s)==CAIRO_STATUS_SUCCESS){int iw=cairo_image_surface_get_width(s),ih=cairo_image_surface_get_height(s);double scale=std::min(double(w)/iw,double(h-12)/ih);cairo_save(c.c);cairo_translate(c.c,x+(w-iw*scale)/2,y+(h-ih*scale)/2);cairo_scale(c.c,scale,scale);cairo_set_source_surface(c.c,s,0,0);cairo_paint(c.c);cairo_restore(c.c);}else text(c,x+30,y+70,"Preview unavailable",20,true,w-60);}
+ void button(Canvas&c,int x,int y,int w,const std::string&label,const std::string&method,const std::string&params="{}",bool primary=false,int h=48){round(c,x,y,w,h,9,primary?ShelfTheme::accent:ShelfTheme::secondary);if(primary){cairo_save(c.c);cairo_rectangle(c.c,x+14,y+8,w-28,h-10);cairo_clip(c.c);c.text(x+16,y+h/2+7,label,19,0,0,0);cairo_restore(c.c);}else text(c,x+16,y+h/2+7,label,19,false,w-28);buttons.push_back({x,y,w,h,method,params});feedback(c,x,y,w,h,method,params);}
+ void art(Canvas&c,json_object*m,int x,int y,int w,int h,int index=0){round(c,x,y,w,h,14,ShelfTheme::artwork);auto*pics=field(m,"screenshots");int n=pics?json_object_array_length(pics):0;if(!n){text(c,x+w/2-20,y+h/2+18,"M",56);return;}auto*p=json_object_array_get_idx(pics,index%n);auto path=textfield(p,"path");auto*s=image(path);if(cairo_surface_status(s)==CAIRO_STATUS_SUCCESS){int iw=cairo_image_surface_get_width(s),ih=cairo_image_surface_get_height(s);double scale=std::min(double(w)/iw,double(h-12)/ih);cairo_save(c.c);cairo_translate(c.c,x+(w-iw*scale)/2,y+(h-ih*scale)/2);cairo_scale(c.c,scale,scale);cairo_set_source_surface(c.c,s,0,0);cairo_paint(c.c);cairo_restore(c.c);}else text(c,x+30,y+70,"Preview unavailable",20,true,w-60);}
  std::string transferLabel(json_object*t){auto stage=textfield(t,"stage");return stage=="downloading"?"Downloading":stage=="checking"?"Checking download":stage=="installing"?"Installing":stage=="ready"?"Ready when Off":stage=="complete"?"Installed · Ready":stage=="setting_up"?"Setting up":stage=="setup_failed"?"Setup needs retry":"Download needs retry";}
  std::string updateLabel(json_object*m){auto status=textfield(m,"update_status");return status=="ready"?"Update ready":status=="review"?"Review update":status=="failed"?"Update needs retry":status=="held"?"Previous version kept":status=="available"?"Update available":"Installed";}
  double fraction(json_object*t){double total=json_object_get_double(field(t,"total_bytes"));return total>0?std::clamp(json_object_get_double(field(t,"received_bytes"))/total,0.,1.):0.;}
  void progressBar(Canvas&c,json_object*t,int x,int y,int width){
-  round(c,x,y,width,7,3,.06,.12,.20);double fill=width*fraction(t);if(fill>0)c.rect(x,y,std::max(1,int(fill)),7,.36,.66,1.0);
+  round(c,x,y,width,7,3,ShelfTheme::track);double fill=width*fraction(t);if(fill>0)ShelfTheme::rect(c,x,y,std::max(1,int(fill)),7,ShelfTheme::accent);
  }
  void power(Canvas&c,json_object*m,int x,int y){
   if(auto*setup=field(m,"setup");setup&&!boolfield(setup,"ready")){button(c,x,y,116,(textfield(setup,"stage")=="queued"||textfield(setup,"stage")=="running")?"View setup":"Set up","ui.setup",argsFor(textfield(m,"id")),true);return;}
   bool on=boolfield(m,"enabled");auto params=argsFor(textfield(m,"id"),"enabled",json_object_new_boolean(!on));
   text(c,x+6,y+31,on?"On":"Off",18,false,40);
-  round(c,x+58,y+10,52,28,14,on?.36:.12,on?.66:.18,on?1.0:.26);
-  cairo_arc(c.c,x+(on?96:72),y+24,10,0,2*M_PI);cairo_set_source_rgb(c.c,.95,.97,1.0);cairo_fill(c.c);
+  round(c,x+58,y+10,52,28,14,on?ShelfTheme::accent:ShelfTheme::track);
+  cairo_arc(c.c,x+(on?96:72),y+24,10,0,2*M_PI);ShelfTheme::source(c,ShelfTheme::text);cairo_fill(c.c);
   buttons.push_back({x,y,116,48,"module.toggle",params});feedback(c,x,y,116,48,"module.toggle",params);
  }
  void sidebar(Canvas&c,json_object*state){
-  c.rect(0,0,222,H,0,0,0);c.rect(221,0,1,H,.08,.13,.20);
-  round(c,25,34,37,39,7,.36,.66,1.0);c.text(31,63,"M",25,.015,.035,.07);text(c,76,63,"MagicShelf",25);
+  ShelfTheme::rect(c,0,0,222,H,ShelfTheme::background);ShelfTheme::rect(c,221,0,1,H,ShelfTheme::border);
+  ShelfTheme::logo(c,10,18,64);text(c,76,63,"MagicShelf",24);
   button(c,20,141,180,"Discover","ui.discover","{}",view=="discover");
   button(c,20,199,180,"My Shelf","ui.library","{}",view=="library");
   button(c,20,257,180,"Settings","ui.preferences","{}",view=="settings");
@@ -73,14 +73,14 @@ struct StoreUI{
  }
  bool setupFocused(json_object*m)const{return tab=="settings"&&boolfield(m,"installed")&&field(m,"setup")&&!boolfield(field(m,"setup"),"ready");}
  void draw(Canvas&c,json_object*state,bool busy,const std::string&message,bool actionFailed=false){
-  working=busy;buttons.clear();c.fill(0,0,0);sidebar(c,state);
+  working=busy;buttons.clear();c.fill(ShelfTheme::background.r,ShelfTheme::background.g,ShelfTheme::background.b);sidebar(c,state);
   auto*m=find(state,selected);if(!selected.empty()&&!m)selected.clear();
   bool setup=setupFocused(m)&&reviewId.empty();
   if(m&&!setup)text(c,254,55,"Collection / "+textfield(m,"name"),17,true,670);
-  c.rect(254,94,994,1,.08,.13,.20);
+  ShelfTheme::rect(c,254,94,994,1,ShelfTheme::border);
   if(!reviewId.empty())review(c,state);else if(m)detail(c,m,state);else if(view=="settings")preferences(c,state);else collection(c,state);
   auto*t=field(state,"transfer");std::string status=boolfield(t,"active")?transferLabel(t)+" · "+textfield(t,"name"):busy?"Updating your shelf... You can keep browsing.":message;
-  if(!setup||actionFailed){c.rect(254,848,994,1,.08,.13,.20);text(c,254,869,actionFailed?message:status,14,true,994);if(!setup)text(c,254,891,textfield(state,"update_message"),12,true,994);}
+  if(!setup||actionFailed){ShelfTheme::rect(c,254,848,994,1,ShelfTheme::border);text(c,254,869,actionFailed?message:status,14,true,994);if(!setup)text(c,254,891,textfield(state,"update_message"),12,true,994);}
  }
  void collection(Canvas&c,json_object*state){
   text(c,254,171,view=="discover"?"Explore the Collection":"My Shelf",38);
@@ -90,7 +90,7 @@ struct StoreUI{
   int count=std::min(4,int(items.size())-page*4);bool big=count<=2;int cardH=big?548:270,artH=big?340:124;
   for(int n=0;n<count;n++){
    auto*m=items[page*4+n];int x=254+(n%2)*510,y=220+(n/2)*288;
-   round(c,x,y,484,cardH,14,.025,.04,.065);art(c,m,x,y,484,artH);
+   round(c,x,y,484,cardH,14,ShelfTheme::panel);art(c,m,x,y,484,artH);
    text(c,x+21,y+artH+29,textfield(m,"category"),13,true,445);text(c,x+21,y+artH+61,textfield(m,"name"),25,false,445);
    if(big)wrap(c,x+21,y+artH+92,442,textfield(m,"description"),17,2);
    auto params=argsFor(textfield(m,"id"));buttons.push_back({x,y,484,cardH-72,"ui.detail",params});feedback(c,x,y,484,cardH-72,"ui.detail",params);
@@ -143,7 +143,7 @@ struct StoreUI{
     text(c,1004,y+31,settingValue(control,value),23,false,174);
     if(n<hi-.000001)button(c,1194,y,54,"+","settings.update",settingArgs(key,json_object_new_double(std::clamp(std::round((n+step)*1000000)/1000000,lo,hi))));
    }
-   c.rect(278,y+78,970,1,.06,.10,.16);
+   ShelfTheme::rect(c,278,y+78,970,1,ShelfTheme::border);
   }
   if(settingsTab=="app"){
    text(c,278,518,"Updates",24);wrap(c,278,553,650,"Updates download automatically and install while a creation is Off. Checks run every five minutes. Use Check updates any time.",18,3);
@@ -184,7 +184,7 @@ struct StoreUI{
   else if(boolfield(m,"needs_framework_update"))button(c,738,416,510,"Update MagicShelf to continue","ui.appupdates","{}",true);
   else if(boolfield(m,"subscription_available"))button(c,738,416,510,"Subscribe & download","ui.subscribe",argsFor(id),true);
   std::string note=boolfield(m,"adapter")?"Local build. Downloadable releases are still being prepared.":!textfield(m,"update_note").empty()?textfield(m,"update_note"):"Subscribe to download this creation and receive updates.";wrap(c,738,488,508,note,16,2);
-  int tx=738;for(auto t:{"about","settings","credits","links"}){std::string name=t;name[0]=toupper(name[0]);button(c,tx,541,120,name,std::string("ui.tab.")+t,"{}",false,42);if(tab==t)c.rect(tx+10,581,100,3,.36,.66,1.0);tx+=130;}
+  int tx=738;for(auto t:{"about","settings","credits","links"}){std::string name=t;name[0]=toupper(name[0]);button(c,tx,541,120,name,std::string("ui.tab.")+t,"{}",false,42);if(tab==t)ShelfTheme::rect(c,tx+10,581,100,3,ShelfTheme::accent);tx+=130;}
   if(tab=="about"){wrap(c,738,616,508,textfield(m,"about"),18,5);auto*links=field(m,"links");for(size_t i=0;links&&i<std::min(size_t(2),json_object_array_length(links));i++){auto*l=json_object_array_get_idx(links,i);button(c,738+int(i)*260,773,248,textfield(l,"label"),"module.link",argsFor(id,"index",json_object_new_int(i)),false,48);}}
   else if(tab=="settings"){
    if(!boolfield(m,"installed")){wrap(c,738,625,508,"Subscribe and download this creation to configure it.",20,3);return;}

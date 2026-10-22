@@ -545,3 +545,24 @@ Valve app, not a factory-fresh Frame or fresh downloads of all three creation
 requirements. First-time access to those components on a tester's own account
 remains a beta check. The Steam client command was verified on the current Frame
 build; the fallback remains available if client behavior or account access differs.
+
+## 0.3.12 Steam logo and storefront colors
+
+The native header now draws the same blue shelf outline and light M as the Steam
+icon. A shared native palette and logo renderer keep the icon, header, buttons,
+switches, tabs and progress bars consistent. Panels are closer to black, with
+matching blue accents and light lettering. The diagnostic web view uses the same
+logo geometry and palette.
+
+- The generated Steam icon is byte-for-byte identical to the installed 0.3.11
+  icon; the header was visually checked using the native preview and live Frame
+  capture at 2560 by 1800.
+- All 112 Python tests pass locally and on Frame. Native navigation/hit targets
+  and persistent GPU texture checks pass on both machines.
+- The exact verified 0.3.12 ARM64 archive was installed on Frame. Both MagicShelf
+  services are active with zero restarts, and rendering uses one texture.
+- Existing creation state, subscriptions and shelf preferences were preserved.
+  SteamVR kept the same process. Both creations were already removed/Off before
+  this visual update and were left in that state.
+
+This change does not modify creation setup, downloads or runtime behavior.
