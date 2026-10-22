@@ -86,13 +86,34 @@ license independently of the framework code.
 `module.subscribe` takes `id`, boolean `subscribed`, and, when subscribing, the
 reviewed `permissions` array. It installs an absent package Off and persists the
 original catalog and approved permissions. The manager refreshes catalogs ten
-seconds after startup and every fifteen minutes, then updates subscribed packages.
-`subscriptions.sync` performs the same check on demand; `catalog.refresh` also
-applies subscription updates. Downloads retain the enabled state and use normal
-package staging, checksums, readiness checks and recovery. Newly requested
-permissions wait for explicit review. An offline check or failed download keeps
-the existing installation and retries on the next scheduled check. Snapshot
-`update_message` reports failures and permission reviews.
+seconds after startup and every five minutes. `subscriptions.sync` and
+`catalog.refresh` request the same check in the background and return immediately.
+`checking_updates` reports catalog activity; navigation remains available.
+Catalogs are fetched independently, and unavailable sources retain their cached
+listings without blocking healthy publishers. Failed checks retry after a minute;
+failed creation downloads back off from one minute to fifteen minutes. A manual
+check retries failed downloads immediately.
+
+Downloaded archives are checked against size, SHA-256 and the package contract.
+An update for an On creation is cached and reported as `ready`; its process keeps
+running. Turning it Off installs the cached update automatically. Off creations
+update immediately. **Update now** explicitly reviews and installs an update,
+restarting that creation if it is On. New permissions always require review.
+Unsubscribing cancels queued installation. A withdrawn update is discarded after
+a successful catalog check.
+
+Install and restore operations keep a recovery journal and a copy of module data.
+A manager process interruption is recovered before another installation begins.
+A failed first start after an update installed while Off restores the previous
+version and its module data. **Restore previous** also holds the replaced version
+so an automatic check does not reinstall it. A newer release can still update,
+and explicit approval can retry the held version. Backups cover `module-data`;
+creation-specific external runtimes and their data need their own recovery support.
+
+The snapshot supplies `update_message`, `last_update_check`, `catalog_errors` and
+per-creation `update_status` / `update_note`. Status values are `current`,
+`available`, `ready`, `review`, `failed` and `held`. The transfer's `ready` stage
+means the verified archive is waiting for Off, not that installation is complete.
 
 Unsubscribing keeps the installed creation and saved data. Removing a download
 cancels its subscription. A different catalog cannot replace a subscribed or

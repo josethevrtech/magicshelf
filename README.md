@@ -1,36 +1,16 @@
 # MagicShelf
 
-MagicShelf is a home for my VR creations. Subscribe to your favorites and make your shelf your own.
+MagicShelf is a home for the random experiments I (@josethevrtech) work on. Subscribe to your favorites and make your shelf your own.
 
-Built for **SteamOS and Steam Frame only**. Browse the native SteamVR collection, open a creation for
-screenshots and settings, and find its project links and artist credits.
-Subscriptions download published creations and keep them up to date.
-
-## See MagicShelf
-
-A look at the **0.3.6 development build** on Steam Frame. The public installer below is still **0.1.3**.
+Built for **SteamOS and Steam Frame ONLY**.
 
 [![Watch the MagicShelf feature tour](https://github.com/user-attachments/assets/a3043c97-b729-4f46-8c98-a9f49aa84bb7)](https://github.com/user-attachments/assets/b95519ce-6af4-4641-800a-8c65aad8a6dd)
-
-**[Watch the 48-second feature tour with music](https://github.com/user-attachments/assets/b95519ce-6af4-4641-800a-8c65aad8a6dd)** — explore creations, card On/Off controls, artist credits, permission reviews, automatic downloads and shelf customization.
 
 | Discover | Creation details |
 | --- | --- |
 | ![Discover on Steam Frame](https://github.com/user-attachments/assets/b4ccd554-1e5b-45ff-ba4d-64f458f648a0) | ![Android Phone (Virtual)](https://github.com/user-attachments/assets/33bc835e-c0ba-4341-9958-5cf267bd5446) |
 | **Artist credits** | **Shelf settings** |
 | ![Smartphone Digivice artist credits](https://github.com/user-attachments/assets/e0a8cbb0-e3cc-43d0-b6bf-f9601ec10187) | ![Shelf customization controls](https://github.com/user-attachments/assets/94353032-21fa-4667-8835-db186a7d807f) |
-
-The tour uses the native app renderer with current creation metadata. Install and download scenes are illustrative. Music: **Shelf Lights**, composed and synthesized for this tour without external samples. Digivice model: [Jojogape](https://x.com/jojogape); Digital Partner game: [Aludeku](https://aludeku.itch.io/digital-partner-digimon).
-
-## Framework and creations
-
-Each creation has its own source repository and release cycle:
-[Android Phone](https://github.com/josethevrtech/magicshelf-android-phone) and
-[Digivice](https://github.com/josethevrtech/magicshelf-digivice).
-MagicShelf owns the storefront, shelf, SDK, installation and updates.
-Creation projects pin the SDK and can develop independently.
-See [Creating for MagicShelf](docs/CREATING.md) to start a new creation.
-The independent packages target module API 2; legacy installations retain their compatibility adapters until migrated.
 
 ## Install
 
@@ -43,118 +23,8 @@ The installer runs under your user account and needs no administrator password.
 It verifies the release before installing into `~/.local/share/magicshelf`.
 It does not modify the operating system or restart SteamVR.
 
-The first binary release targets **Steam Frame / Linux aarch64**, with Python
-3.12+, systemd user services, Cairo/json-c, and SteamVR installed at
-`/opt/steamvr`. x86_64 is a SteamOS development target, not a tested downloadable release.
-This is an early framework release; the installation and migration validation
-is recorded in [docs/VALIDATION.md](docs/VALIDATION.md).
-
-## Your collection
-
-The storefront is installed locally as **0.3.6** for testing. The public installer
-above remains **0.1.3** until a new release is published. The VR storefront opens
-at 1.8 m wide and renders at 2560 × 1800 for sharper text. The desktop shortcut
-opens this same native dashboard. The display stays on one GPU texture while
-browsing; controller hover/press feedback updates only the affected region.
-Release the trigger over a control to activate it, or move away to cancel.
-Navigation remains available while downloads and updates run.
-
-- **Discover** shows screenshot cards; **My Shelf** shows your installed creations.
-  Selecting Discover always returns to the first collection page.
-- Installed creations have an **On / Off** control directly on their collection
-  card and at the top of their detail page. The compact switch shows only the
-  current state. The Android Phone gallery opens on its Android home screen.
-- Open a creation for its gallery, settings, GitHub links and artist credits.
-  Support links are optional and go directly to the creator's page.
-- **Subscribe & download** installs a creation. Subscribed packages check for updates at
-  startup and every 15 minutes while MagicShelf runs, including while Off.
-  The download progress bar shows actual bytes and percentage, followed by
-  checking and installation. Installation finishes automatically; use the card's
-  power control when you want to run it.
-- On/Off controls running the creation separately from its subscription.
-  Unsubscribing keeps the installation and saved data; removing it also cancels
-  the subscription and keeps saved data.
-- New permissions require review. Failed updates retain the previous working
-  version and data; **Restore previous version** supports manual recovery.
-  The review explains each permission in everyday language before installation.
-- **Settings** customizes shelf size, spacing, opacity and visibility; placement,
-  angle and creation lean; and the app's window size and starting view. Layout
-  adjustments return creations to the dock. Each settings section can restore its
-  own defaults. App and developer credits live in **Settings → Credits**.
-
-**Pocket Clock** is an optional developer example, excluded from the default shelf.
-MagicShelf is the single dashboard entry; open a creation and choose **Configure creation** to manage it.
-The Android Phone and Digivice download from their independent repositories.
-Jojogape's artist link currently
-opens [the supplied X profile](https://x.com/jojogape).
-Older installations can adopt the legacy devices as **Installed locally**.
-For these legacy integrations, Off hides the devices and suspends their game/Android processes, including the
-Android container, so they stop executing and producing audio. On resumes the
-same session in its shelf slot. Their capture connections and memory stay
-allocated to preserve the Android session and pet. Disabled backends no longer
-autostart with SteamVR. Local adapter capability v2, systemd cgroup v2 freezing,
-and Podman for Android are required. MagicShelf does not distribute
-the Android image, the Digital Partner game, or third-party Digivice artwork.
-
-By default, the shelf appears beside Steam's launcher and hides while the launcher is closed
-or another dashboard app is active. Settings can show it on every dashboard page.
-Native expanded sidebar labels cover the
-shelf. Modules can implement their own pick-up and room behavior.
-
-The local phone and Digivice interaction update adds a small grab bar: hold the
-trigger on the bar or outer frame, then use that controller's thumbstick to push
-the creation away or pull it closer. Release to save its position. See the
-[local device upgrade](integrations/local-devices/README.md#grab-and-depth-controls)
-for installation and validation; this update is separate from the v0.1.3 download.
-
-The [dock recovery update](integrations/local-devices/README.md#dock-recovery)
-returns creations home on position/layout resets. Hold and shake a creation to
-send it home, or bring it over the dock and release when its grab bar turns green.
-Each creation returns to its assigned slot.
-
-## A stable module contract
-
-API v1 defines the manifest, package format, environment, readiness message,
-shelf configuration, and home action. Unsupported API or schema versions are
-rejected before execution. Modules run in separate, memory-limited user services.
-See [the module contract](docs/MODULES.md) and the [Pocket Clock source](examples/pocket-clock).
-
-Permissions are declarations for review, not a complete security sandbox. Native
-creations run as your user and can access user resources. Only install modules from
-publishers you trust. Checksum verification detects changed downloads; it does
-not protect against a compromised publisher or catalog.
-
-## Develop
-
-```sh
-python3 -m unittest discover -s tests -v
-bash tools/test_storefront.sh
-bash tools/test_dashboard.sh
-bash build.sh
-```
-
-Build requirements: C++17, pkg-config, Cairo, json-c, EGL/GLES development files,
-and the matching SteamVR `libopenvr_api.so`. The vendored OpenVR header is under
-Valve's BSD license; see [OPENVR-LICENSE.txt](OPENVR-LICENSE.txt).
-
-The legacy browser interface is available only through the explicit
-`magicshelf web` diagnostic command. It is not the app launch path.
-
-Release artifacts are written to `dist/`. Build on the target architecture.
-The build creates the framework archive, catalog, verified bootstrap installer,
-and downloadable `.desktop` launcher. Creations build and publish their own
-`.magicshelf` packages; see [Creating a creation](docs/CREATING.md).
-
-## Remove MagicShelf
+## Uninstall
 
 ```sh
 python3 ~/.local/share/magicshelf/current/uninstall.py
 ```
-
-This stops MagicShelf integration and downloaded modules and keeps releases and saved
-data. Migrated phone/Digivice shells return to their standalone shelf behavior.
-Existing game and Android installations remain in their original locations.
-
-MagicShelf code and Pocket Clock: MIT. OpenVR: Valve BSD 3-Clause. No affiliation
-with Valve, Steam, or Decky Loader. The desktop download flow follows the familiar
-[Decky installer pattern](https://github.com/SteamDeckHomebrew/decky-installer).

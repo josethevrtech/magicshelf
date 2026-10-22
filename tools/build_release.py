@@ -3,7 +3,7 @@
 import argparse, base64, hashlib, json, os, shutil, stat, tarfile, tempfile, zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent.parent
-VERSION='0.3.6'
+VERSION='0.3.7'
 REPO='josethevrtech/magicshelf'
 
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()

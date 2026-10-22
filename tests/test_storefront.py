@@ -108,7 +108,8 @@ class StorefrontTests(unittest.TestCase):
         self.release('1.0.0');self.subscribe();self.release('1.1.0')
         with patch('magicshelf.manager.download',side_effect=OSError('offline')):self.manager.sync_subscriptions(refresh=False)
         self.assertEqual(self.manager.state['modules'][self.key]['version'],'1.0.0')
-        self.assertIn(self.key,self.manager.state['subscriptions']);self.assertIn('offline',self.manager.update_message)
+        self.assertIn(self.key,self.manager.state['subscriptions']);self.assertIn('offline',self.manager.snapshot()['modules'][0]['update_note'])
+        self.assertIn('retry',self.manager.update_message)
     def test_failed_first_download_does_not_create_subscription(self):
         self.release('1.0.0')
         with patch('magicshelf.manager.download',side_effect=OSError('offline')),self.assertRaises(OSError):self.manager.subscribe(self.key,True,['vr-overlay'])

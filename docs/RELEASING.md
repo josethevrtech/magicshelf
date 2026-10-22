@@ -33,7 +33,13 @@ the resulting `.magicshelf`, `catalog.json` and `SHA256SUMS` under a matching
 points to immutable, versioned package URLs and includes their SHA-256 and size.
 Never overwrite published package assets. Followed collections show available
 creations, and free subscriptions download/install future releases automatically.
-New permissions require review; failed updates retain the working version.
+On creations keep running while updates download; installation waits for Off,
+unless the user explicitly chooses Update now. New permissions require review;
+failed updates retain the working version. Run
+`python3 tools/test_update_lifecycle.py --live` on the Frame to exercise cached
+installation and failed-start recovery with an isolated disposable creation.
+This uses real systemd services and readiness RPC but local package transfers.
+Also complete the [tester readiness checks](TESTER_READINESS.md) on a fresh device.
 
 Test a new creation release through its public catalog on the Frame. Confirm
 that update, Off and removal affect only that creation, and that reinstall,

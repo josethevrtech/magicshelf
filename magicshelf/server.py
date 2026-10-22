@@ -34,8 +34,8 @@ def dispatch(manager, packet):
         "module.remove": lambda: manager.remove(p["id"]),
         "module.rollback": lambda: manager.rollback(p["id"]),
         "catalog.add": lambda: manager.add_catalog(p["url"]),
-        "catalog.refresh": lambda: manager.refresh_and_sync(),
-        "subscriptions.sync": lambda: manager.sync_subscriptions(),
+        "catalog.refresh": lambda: manager.request_update_check(),
+        "subscriptions.sync": lambda: manager.request_update_check(),
         "home": lambda: manager.home_all(),
         "settings.update": lambda: manager.update_settings(p.get("changes")),
         "settings.reset": lambda: manager.reset_settings(p.get("group")),
@@ -152,7 +152,8 @@ def serve():
                     manager.sync_subscriptions()
             except Exception as error:
                 manager.update_message = "Automatic updates will retry: " + str(error)[:180]
-            time.sleep(15 * 60)
+            # Check promptly after a failed download or a temporary offline period.
+            time.sleep(60 if manager.catalog_errors or manager.state['update_errors'] else 5 * 60)
     threading.Thread(target=subscriptions, daemon=True).start()
     try:
         server.serve_forever()

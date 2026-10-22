@@ -8,12 +8,14 @@ import shutil
 import subprocess
 import tempfile
 import time
+import threading
 from pathlib import Path
 from . import VERSION
 from .contracts import ContractError, MAX_MODULES, catalog, load, machine, require, version
 from .packages import download, unpack
-from .storefront import cache_images, decorate
+from .storefront import decorate
 from . import preferences
+from .updates import Updates
 
 OFFICIAL = "https://raw.githubusercontent.com/josethevrtech/magicshelf/main/catalog.json"
 ADAPTERS = {
@@ -60,7 +62,7 @@ class System:
                 subprocess.run(["podman", "pause" if paused else "unpause", item["Id"]],
                                check=True, text=True, capture_output=True, timeout=15)
 
-class Manager:
+class Manager(Updates):
     def __init__(self, home=None, runtime=None, system=None):
         self.home = Path(home or Path.home())
         self.root = self.home / ".local/share/magicshelf"
@@ -92,9 +94,18 @@ class Manager:
         self.sessions = load(self.sessionpath) if self.sessionpath.exists() else {}
         self.ready = set()
         self.state.setdefault("subscriptions", {})
+        for field in ("pending_updates", "update_errors", "held_updates"):
+            self.state.setdefault(field, {})
+        self._sync_lock = threading.Lock()
+        self._refresh_lock = threading.Lock()
+        self._preview_lock = threading.Lock()
+        self._request_lock = threading.Lock()
+        self._check_thread = None
+        self.checking = False
+        self.catalog_errors = {}
         self.update_message = "Subscriptions check for updates automatically."
         self.message = "Ready"
-        self.busy = False
+        self.busy = (self.config / 'pending-install.json').exists()
         self.transfer = None
         self.publish()
 
@@ -104,6 +115,9 @@ class Manager:
             fcntl.flock(f, fcntl.LOCK_EX)
             self.busy = True
             try:
+                # The first action after an interrupted worker must recover before
+                # another install can overwrite its journal.
+                self.recover_install()
                 yield
             finally:
                 self.busy = False
@@ -195,7 +209,7 @@ class Manager:
             elif key in self.ready and self.system.active(self.unit(key)):
                 return
             time.sleep(.25)
-        raise ContractError("Creation did not become ready; its previous version has been restored")
+        raise ContractError("This creation could not start. Try again or restore its previous version in Settings.")
 
     def pause_adapter(self, key):
         marker = self.legacy / "magicshelf-api-version"
@@ -230,10 +244,17 @@ class Manager:
             self.system.call("start", *ADAPTERS[key]["backends"])
             subprocess.run([str(self.legacy / ADAPTERS[key]["binary"]), "--dock"], timeout=3, check=True)
 
+    def stop_packaged(self, key, disable=False):
+        unit = 'magicshelf-module-' + key + '.service'
+        args = ('disable', '--now', unit) if disable else ('stop', unit)
+        self.system.call(*args, check=(self.units / unit).exists())
+        require(not self.system.active(unit), 'This creation is still stopping. Please try again.')
+
     def toggle(self, key, enabled):
         require(type(enabled) is bool, "enabled must be true or false")
         require(key in self.state["modules"], "Creation is not installed")
         with self.transaction():
+            recovered = False
             old = self.state["modules"][key]["enabled"]
             require(not enabled or old or sum(bool(i["enabled"]) for i in self.state["modules"].values()) < MAX_MODULES, "The shelf is full")
             self.state["modules"][key]["enabled"] = enabled
@@ -247,7 +268,7 @@ class Manager:
                 elif self.is_adapter(key):
                     self.pause_adapter(key)
                 else:
-                    self.system.call("disable", "--now", self.unit(key), check=False)
+                    self.stop_packaged(key, disable=True)
             except Exception:
                 self.state["modules"][key]["enabled"] = old
                 self.save()
@@ -256,10 +277,31 @@ class Manager:
                         self.enable_adapter(key)
                     else:
                         self.pause_adapter(key)
+                elif enabled and self.state["modules"][key].get("needs_first_start") and self.state["modules"][key].get("previous_version"):
+                    self.system.call("disable", "--now", self.unit(key), check=False)
+                    self.state["modules"][key]["enabled"] = False
+                    self.save()
+                    self.rollback_item(key)
+                    self.state["modules"][key]["enabled"] = True
+                    self.save()
+                    try:
+                        self.start(key)
+                    except Exception:
+                        self.state["modules"][key]["enabled"] = False
+                        self.save()
+                        self.system.call("disable", "--now", self.unit(key), check=False)
+                        raise
+                    recovered = True
                 elif not old:
                     self.system.call("disable", "--now", self.unit(key), check=False)
-                raise
-            self.message = ("Enabled " if enabled else "Turned off ") + self.metadata(key, self.state["modules"][key])["name"]
+                if not recovered:
+                    raise
+            if enabled and self.system.active("steamvr.service"):
+                self.state["modules"][key].pop("needs_first_start", None)
+                self.save()
+            self.message = "The update could not start. Your previous version is running again." if recovered else ("Enabled " if enabled else "Turned off ") + self.metadata(key, self.state["modules"][key])["name"]
+            if not enabled:
+                self.apply_pending(key)
         return self.snapshot()
 
     def control(self, key, command):
@@ -293,74 +335,18 @@ class Manager:
                 self.save()
         return self.refresh()
 
-    def refresh(self):
-        with self.transaction():
-            items = []
-            seen = set()
-            for url in self.state["catalogs"]:
-                with tempfile.TemporaryDirectory(dir=self.root) as temp:
-                    path = Path(temp) / "catalog.json"
-                    download(url, path, 1024 * 1024)
-                    data = catalog(load(path))
-                for item in data["modules"]:
-                    if item["id"] not in seen and not self.is_adapter(item["id"]) and item["architecture"] == machine():
-                        items.append({**item, "catalog_url": url})
-                        seen.add(item["id"])
-            self.state["catalog"] = items
-            self.save()
-            self.message = "Collection updated"
-        cache_images(items, self.root)
-        return self.snapshot()
-
     def install(self, key, permissions):
         with self.transaction():
             self.install_item(key, permissions)
         return self.snapshot()
-
-    def refresh_and_sync(self):
-        self.refresh()
-        return self.sync_subscriptions(refresh=False)
-
-    def install_item(self, key, permissions):
-        # Called only while holding the manager transaction lock.
-        item = next((i for i in self.state["catalog"] if i["id"] == key), None)
-        require(item is not None, "Creation is not in a followed collection")
-        require(isinstance(permissions, list) and set(permissions) == set(item["permissions"]), "Review this creation's permissions before installing")
-        old = self.state["modules"].get(key)
-        require(not old or not old.get("catalog_url") or old["catalog_url"] == item["catalog_url"], "A different collection cannot replace this creation")
-        self.transfer = dict(id=key, name=item['name'], stage='downloading', received_bytes=0, total_bytes=item['size_bytes'], active=True)
-        last_publish = 0.
-        def progress(received):
-            nonlocal last_publish
-            self.transfer = {**self.transfer, 'received_bytes': received}
-            now = time.monotonic()
-            if now - last_publish >= .2 or received == item['size_bytes']:
-                self.publish()
-                last_publish = now
-        def stage(name, active=True, **extra):
-            self.transfer = {**self.transfer, 'stage': name, 'active': active, **extra}
-            self.publish()
-        try:
-            with tempfile.TemporaryDirectory(dir=self.root) as temp:
-                archive = Path(temp) / "module.magicshelf"
-                download(item["url"], archive, item["size_bytes"], progress=progress)
-                require(archive.stat().st_size == item["size_bytes"], "Package size differs from catalog")
-                stage('checking', received_bytes=item['size_bytes'])
-                staged = Path(temp) / "unpacked"
-                unpack(archive, staged, item["sha256"], item)
-                stage('installing')
-                self.commit_package(key, item["version"], staged, item["catalog_url"])
-                stage('complete', active=False)
-                return self.snapshot()
-        except Exception as error:
-            stage('failed', active=False, error=str(error)[:180])
-            raise
 
     def subscribe(self, key, subscribed, permissions=None):
         require(type(subscribed) is bool, "subscribed must be true or false")
         with self.transaction():
             if not subscribed:
                 self.state["subscriptions"].pop(key, None)
+                self.state["pending_updates"].pop(key, None)
+                self.state["update_errors"].pop(key, None)
                 self.save()
                 self.message = "Unsubscribed. Your installed creation and saves are kept."
             else:
@@ -374,39 +360,7 @@ class Manager:
                     self.install_item(key, permissions)
                 self.state["subscriptions"][key] = {"catalog_url": item["catalog_url"], "permissions": list(permissions)}
                 self.save()
-                self.message = "Installed and subscribed. Future updates install automatically."
-        return self.snapshot()
-
-    def sync_subscriptions(self, refresh=True):
-        if refresh:
-            try:
-                self.refresh()
-            except Exception as error:
-                self.update_message = "Updates will retry: " + str(error)[:180]
-                return self.snapshot()
-        if not self.state["subscriptions"]:
-            self.update_message = "Collection checked. Subscribe to receive automatic updates."
-            return self.snapshot()
-        failures, updated = [], 0
-        for key in list(self.state["subscriptions"]):
-            with self.transaction():
-                sub = self.state["subscriptions"].get(key)
-                if not sub:  # An unsubscribe while checking cancels this update.
-                    continue
-                item = next((i for i in self.state["catalog"] if i["id"] == key and i.get("catalog_url") == sub["catalog_url"]), None)
-                installed = self.state["modules"].get(key)
-                if not item or (installed and version(item["version"]) <= version(installed["version"])):
-                    continue
-                if not set(item["permissions"]).issubset(sub["permissions"]):
-                    failures.append(item["name"] + " needs a permissions review")
-                    continue
-                try:
-                    self.install_item(key, item["permissions"])
-                    updated += 1
-                except Exception as error:
-                    failures.append(item["name"] + ": " + str(error)[:140])
-        self.update_message = "; ".join(failures) if failures else (str(updated) + " creation(s) updated." if updated else "Your subscriptions are up to date.")
-        self.publish()
+                self.message = "Installed and subscribed. Updates download automatically and install while Off."
         return self.snapshot()
 
     def open_link(self, key, index):
@@ -430,43 +384,79 @@ class Manager:
             require(not old.get("adapter"), "Local adapters cannot be overwritten by downloads")
             require(version(ver) > version(old["version"]), "Install must be a newer version")
         target = self.modulepath(key, ver)
-        require(not target.exists(), "That version already exists")
+        created = not target.exists()
+        if not created:
+            # A manual retry after Restore previous may reuse an immutable release.
+            import hashlib
+            def contents(directory):
+                result = {}
+                for p in directory.rglob('*'):
+                    require(not p.is_symlink(), "Installed package contains an unexpected link")
+                    if p.is_file():
+                        with p.open('rb') as stream:
+                            result[str(p.relative_to(directory))] = (hashlib.file_digest(stream, 'sha256').hexdigest(), p.stat().st_mode & 0o777)
+                return result
+            require(contents(target) == contents(staged), "The installed copy of this update has changed. Remove the creation and download it again; saves are kept.")
         target.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(staged, target)
         enabled = bool(old and old["enabled"])
         data = self.root / "module-data" / key
         checkpoint = self.root / "data-backups" / key / str(time.time_ns())
-        checkpoint_ready = False
+        journal = {"id": key, "version": ver, "old": old, "checkpoint": str(checkpoint), "phase": "preparing", "created": created}
+        atomic(self.config / 'pending-install.json', journal)
         try:
+            if created:
+                os.replace(staged, target)
             if enabled:
                 self.system.call("stop", self.unit(key))
             if old and data.exists():
                 checkpoint.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copytree(data, checkpoint, symlinks=True)
-                checkpoint_ready = True
-            self.state["modules"][key] = {"version": ver, "enabled": enabled, "previous_version": old["version"] if old else None, "previous_data": str(checkpoint) if checkpoint.exists() else None, "catalog_url": source}
+            journal['phase'] = 'switching'
+            atomic(self.config / 'pending-install.json', journal)
+            self.state["modules"][key] = {"version": ver, "enabled": enabled, "previous_version": old["version"] if old else None, "previous_data": str(checkpoint) if checkpoint.exists() else None, "catalog_url": source, "needs_first_start": bool(old and not enabled)}
             self.save()
             if enabled:
                 self.start(key)
+            (self.config / 'pending-install.json').unlink()
             self.message = "Installed " + self.metadata(key, self.state["modules"][key])["name"]
             return self.snapshot()
         except Exception:
-            self.system.call("stop", self.unit(key), check=False)
-            if checkpoint_ready:
-                if data.exists():
-                    data.rename(data.with_name(key + ".failed-" + str(time.time_ns())))
-                checkpoint.rename(data)
-            if old:
-                self.state["modules"][key] = old
-            else:
-                self.state["modules"].pop(key, None)
-            self.save()
-            try:
-                if old and enabled:
-                    self.start(key)
-            finally:
-                shutil.rmtree(target)
+            self.recover_install()
+            if old and enabled:
+                self.start(key)
             raise
+
+    def recover_install(self):
+        """Finish recovery before startup reconciliation after an interrupted update."""
+        path = self.config / 'pending-install.json'
+        if not path.exists():
+            return
+        journal = load(path)
+        key, old = journal['id'], journal['old']
+        self.stop_packaged(key)
+        data = self.root / 'module-data' / key
+        checkpoint = Path(journal['checkpoint'])
+        if journal['phase'] == 'switching':
+            if data.exists():
+                data.rename(data.with_name(key + '.interrupted-' + str(time.time_ns())))
+            if checkpoint.exists():
+                # Keep the checkpoint until recovery commits, including across
+                # another interruption while this copy is being made.
+                shutil.copytree(checkpoint, data, symlinks=True)
+        if old:
+            self.state['modules'][key] = old
+        else:
+            self.state['modules'].pop(key, None)
+        self.save()
+        if old:
+            self.write_unit(key)
+        else:
+            (self.units / ('magicshelf-module-' + key + '.service')).unlink(missing_ok=True)
+            self.system.call('daemon-reload')
+        if journal['created']:
+            shutil.rmtree(self.modulepath(key, journal['version']), ignore_errors=True)
+        path.unlink()
+        self.message = 'An interrupted update was recovered. Your previous version is kept.'
 
     def bootstrap(self):
         release = Path(__file__).resolve().parent.parent
@@ -486,6 +476,7 @@ class Manager:
     def reconcile(self):
         # Repair interrupted toggles without restarting healthy creations or backends.
         with self.transaction():
+            self.recover_install()
             self.layout()
             for key, item in list(self.state["modules"].items()):
                 try:
@@ -499,58 +490,72 @@ class Manager:
                     elif self.is_adapter(key):
                         self.pause_adapter(key)
                     else:
-                        self.system.call("disable", "--now", self.unit(key), check=False)
+                        self.stop_packaged(key, disable=True)
+                        self.apply_pending(key)
                 except Exception as e:
                     self.message = "Could not apply saved state for " + key + ": " + str(e)
 
     def rollback(self, key):
+        with self.transaction():
+            self.rollback_item(key)
+        return self.snapshot()
+
+    def rollback_item(self, key):
         require(key in self.state["modules"] and not self.is_adapter(key), "Only packaged creations support version rollback")
         old = dict(self.state["modules"][key])
         previous = old.get("previous_version")
         require(previous and self.modulepath(key, previous).is_dir(), "No previous version is available")
         data = self.root / "module-data" / key
         archived = self.root / "data-backups" / key / ("before-rollback-" + str(time.time_ns()))
-        with self.transaction():
+        displaced = data.with_name(key + '.before-restore-' + str(time.time_ns()))
+        journal = {"id": key, "version": previous, "old": old, "checkpoint": str(archived), "phase": "preparing", "created": False}
+        atomic(self.config / 'pending-install.json', journal)
+        try:
             if old["enabled"]:
                 self.system.call("stop", self.unit(key))
             if data.exists():
                 archived.parent.mkdir(parents=True, exist_ok=True)
-                data.rename(archived)
+                shutil.copytree(data, archived, symlinks=True)
+            journal['phase'] = 'switching'
+            atomic(self.config / 'pending-install.json', journal)
+            if data.exists():
+                data.rename(displaced)
             checkpoint = Path(old["previous_data"]) if old.get("previous_data") else None
-            try:
-                if checkpoint and checkpoint.exists():
-                    shutil.copytree(checkpoint, data, symlinks=True)
-                self.state["modules"][key] = {**old, "version": previous, "previous_version": old["version"], "previous_data": str(archived) if archived.exists() else None}
-                self.save()
-                if old["enabled"]:
-                    self.start(key)
-                self.message = "Restored previous creation version and its saved data"
-            except Exception:
-                self.system.call("stop", self.unit(key), check=False)
-                if data.exists():
-                    data.rename(data.with_name(key + ".failed-rollback-" + str(time.time_ns())))
-                if archived.exists():
-                    archived.rename(data)
-                self.state["modules"][key] = old
-                self.save()
-                if old["enabled"]:
-                    self.start(key)
-                raise
-        return self.snapshot()
+            if checkpoint and checkpoint.exists():
+                shutil.copytree(checkpoint, data, symlinks=True)
+            self.state["modules"][key] = {**old, "version": previous, "previous_version": old["version"], "previous_data": str(archived) if archived.exists() else None, "needs_first_start": False}
+            self.save()
+            if old["enabled"]:
+                self.start(key)
+            self.state["held_updates"][key] = old["version"]
+            self.state["pending_updates"].pop(key, None)
+            self.state["update_errors"].pop(key, None)
+            self.save()
+            (self.config / 'pending-install.json').unlink()
+        except Exception:
+            self.recover_install()
+            if old["enabled"]:
+                self.start(key)
+            raise
+        shutil.rmtree(displaced, ignore_errors=True)
+        self.message = "Restored previous version. Automatic updates will skip the version you replaced."
 
     def remove(self, key):
         require(key in self.state["modules"], "Creation is not installed")
         require(not self.is_adapter(key), "Local devices can be turned off; MagicShelf does not delete their existing installations")
         with self.transaction():
-            self.system.call("disable", "--now", self.unit(key), check=False)
+            self.stop_packaged(key, disable=True)
             self.state["modules"].pop(key)
             self.state["subscriptions"].pop(key, None)
+            for field in ("pending_updates", "update_errors", "held_updates"):
+                self.state[field].pop(key, None)
             self.save()
             (self.units / self.unit(key)).unlink(missing_ok=True)
             self.system.call("daemon-reload")
             shutil.rmtree(self.root / "modules" / key)
             if self.transfer and self.transfer['id'] == key:
                 self.transfer = None
+            shutil.rmtree(self.root / "downloads" / key, ignore_errors=True)
             self.message = "Creation removed; its saved data is kept"
         return self.snapshot()
 
@@ -616,7 +621,8 @@ class Manager:
             item["subscribed"] = bool(sub)
             item["subscription_available"] = not self.is_adapter(item["id"]) and any(i["id"] == item["id"] for i in self.state["catalog"])
             item["update_mode"] = "local" if self.is_adapter(item["id"]) else "automatic" if sub else "manual"
-        return {"api_version": 1, "version": VERSION, "modules": modules, "catalogs": self.state["catalogs"], "preferences": preferences.snapshot(load(self.layoutpath)), "transfer": self.transfer, "busy": self.busy, "message": self.message, "update_message": self.update_message}
+            item["update_status"], item["update_note"] = self.update_status(item["id"], item)
+        return {"api_version": 1, "version": VERSION, "modules": modules, "catalogs": self.state["catalogs"], "preferences": preferences.snapshot(load(self.layoutpath)), "transfer": self.transfer, "busy": self.busy, "message": self.message, "update_message": self.update_message, "checking_updates": self.checking, "last_update_check": self.state.get("last_update_check"), "catalog_errors": self.catalog_errors}
 
     def publish(self):
         atomic(self.runtime / "ui-state.json", self.snapshot())

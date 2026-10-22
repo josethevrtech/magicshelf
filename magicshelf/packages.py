@@ -2,6 +2,9 @@
 import hashlib
 import os
 import stat
+import time
+import http.client
+import urllib.error
 import urllib.request
 import urllib.parse
 import zipfile
@@ -23,20 +26,49 @@ class GithubRedirect(urllib.request.HTTPRedirectHandler):
 
 def download(url, path, limit=MAX_BYTES, progress=None):
     check_url(url)
+    path = Path(path)
+    # Never remove a file supplied by the caller. Each retry owns only the
+    # incomplete file it created; verification still happens after downloading.
+    if path.exists():
+        raise FileExistsError(path)
     opener = urllib.request.build_opener(GithubRedirect())
     request = urllib.request.Request(url, headers={"User-Agent": "MagicShelf/0.1", "Accept": "application/octet-stream"})
-    count = 0
-    if progress:
-        progress(0)
-    with opener.open(request, timeout=30) as response, open(path, "xb") as output:
-        check_url(response.geturl())
-        while chunk := response.read(65536):
-            count += len(chunk)
-            require(count <= limit, "Download exceeds its declared limit")
-            output.write(chunk)
-            if progress:
-                progress(count)
-    return count
+    deadline = time.monotonic() + 120
+    for attempt in range(3):
+        count, created = 0, False
+        if progress:
+            progress(0)
+        try:
+            with opener.open(request, timeout=30) as response:
+                check_url(response.geturl())
+                headers = getattr(response, 'headers', None)
+                expected = int(headers.get('Content-Length', 0)) if headers else 0
+                require(expected <= limit, "Download exceeds its declared limit")
+                with open(path, "xb") as output:
+                    created = True
+                    while chunk := response.read(65536):
+                        count += len(chunk)
+                        require(count <= limit, "Download exceeds its declared limit")
+                        if time.monotonic() > deadline:
+                            raise TimeoutError("Download timed out")
+                        output.write(chunk)
+                        if progress:
+                            progress(count)
+                    if expected and count != expected:
+                        raise http.client.IncompleteRead(b'', max(0, expected-count))
+                    output.flush()
+                    os.fsync(output.fileno())
+            return count
+        except Exception as error:
+            if created:
+                path.unlink(missing_ok=True)
+            transient = isinstance(error, (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead))
+            if isinstance(error, urllib.error.HTTPError):
+                transient = error.code in (408, 429, 500, 502, 503, 504)
+                error.close()
+            if not transient or attempt == 2 or time.monotonic() >= deadline:
+                raise
+            time.sleep(2 ** attempt)
 
 def unpack(archive, destination, expected_hash, expected=None):
     require(archive.stat().st_size <= MAX_BYTES, "Package is too large")

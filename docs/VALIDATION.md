@@ -389,3 +389,40 @@ page one. The browser navigation also resets its category and search filters.
 
 MagicShelf 0.3.6 is installed locally; the public framework installer remains
 0.1.3. Category browsing for the native collection is future work.
+
+## Creation update hardening 0.3.7, October 21, 2026
+
+Subscribed creations now download updates while On and install them from verified
+cache when switched Off. Off creations update immediately. Catalog checks run
+every five minutes, and manual checks return without waiting for network work.
+Unavailable catalogs retain their listings; healthy sources continue updating.
+Transient downloads retry, per-creation failures back off, and the native app
+shows ready, review, retry and restored-version states. Restore previous is
+available in the creation's Settings tab and holds the replaced version.
+
+- All 90 Python tests pass locally and on Steam Frame. Coverage includes
+  truncated and failed downloads, cached installation, unsubscribe cancellation,
+  withdrawn updates, permission changes, retry timing, failed stop/removal,
+  interrupted installation/restore, failed first launch and rollback holds.
+- Native storefront checks pass locally and on Frame, including update review,
+  restore confirmation and non-overlapping action targets. Persistent texture
+  checks pass on Frame for full/partial uploads, colors, orientation and 100
+  updates. The diagnostic JavaScript passes syntax checking.
+- The opt-in live lifecycle probe used an isolated creation and real systemd
+  services/readiness RPC. Its running process kept the same PID while an update
+  downloaded; Off applied the cache without another transfer. A deliberately bad
+  next version failed readiness, restored the previous version and saved module
+  data, resumed successfully, and was not automatically downloaded again.
+  Package transfers in this probe used local fixtures.
+- The full ARM build and verified 0.3.7 installer succeeded. A live public catalog
+  check returned in 27 ms and completed with no catalog errors. Creation versions,
+  On/Off states, subscriptions and the entire shelf settings file were unchanged.
+  Android Phone (Virtual) 0.2.5 kept PID 797771, SteamVR kept PID 2571, and
+  Smartphone Digivice 0.2.4 stayed Off. Both MagicShelf services are active with
+  zero automatic restarts. The live Discover capture shows version 0.3.7.
+
+This validates creation update behavior on the prepared development Frame, not
+new-user installation. The public framework installer remains 0.1.3 and there is
+no framework self-updater. The Phone needs its Steam Android runtime; Digivice
+needs separately imported game/model inputs and Steam compatibility runtimes.
+See [TESTER_READINESS.md](TESTER_READINESS.md) for the remaining fresh-device work.

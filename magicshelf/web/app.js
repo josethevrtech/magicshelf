@@ -6,7 +6,7 @@ let snapshot = null, view = 'discover', selected = null, tab = 'about', category
 function el(tag, text, cls) { const n = document.createElement(tag); if (text) n.textContent = text; if (cls) n.className = cls; return n; }
 function button(text, cls, fn) { const b = el('button', text, cls); b.type = 'button'; b.onclick = fn; b.disabled = working || Boolean(snapshot?.busy); return b; }
 function link(text, url, cls = 'project-link') { const a = el('a', text, cls); try { if (new URL(url).protocol !== 'https:') return el('span', text); } catch { return el('span', text); } a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; return a; }
-function transferLabel(t) { return ({downloading:'Downloading',checking:'Checking download',installing:'Installing',complete:'Installed · Ready',failed:'Download failed'})[t.stage] || ''; }
+function transferLabel(t) { return ({downloading:'Downloading',checking:'Checking download',installing:'Installing',ready:'Ready when Off',complete:'Installed · Ready',failed:'Download needs retry'})[t.stage] || ''; }
 function progress(t) { const box=el('div',null,'download-progress');box.append(el('strong',transferLabel(t)));const bar=el('progress');bar.max=t.total_bytes;bar.value=t.received_bytes;bar.setAttribute('aria-label','Download progress for '+t.name);box.append(bar);if(t.stage==='downloading')box.append(el('small',(t.received_bytes/1048576).toFixed(1)+' / '+(t.total_bytes/1048576).toFixed(1)+' MB · '+Math.floor(t.received_bytes/t.total_bytes*100)+'%'));return box; }
 function power(item) { const b=button('','power-toggle',()=>act('module.toggle',{id:item.id,enabled:!item.enabled}));b.append(el('span',item.enabled?'On':'Off'),el('span',null,'power-track'));b.setAttribute('role','switch');b.setAttribute('aria-checked',String(item.enabled));b.setAttribute('aria-label','Turn '+item.name+' on or off');b.lastChild.setAttribute('aria-hidden','true');return b; }
 async function api(method, params = {}) { const r = await fetch('/api', { method: 'POST', headers: {'Content-Type':'application/json','Authorization':'Bearer ' + token}, body: JSON.stringify({api_version:1,method,params}) }); if (!r.ok) throw Error('Open MagicShelf from its desktop shortcut to reconnect.'); const data = await r.json(); if (data.error) throw Error(data.error); return data.result; }
@@ -15,11 +15,11 @@ function choose(next) { view = next; selected = null; category = 'All'; query = 
 function openCreation(id) { selected = id; tab = 'about'; gallery = 0; render(); window.scrollTo(0,0); }
 function review(item, method = 'module.subscribe') {
   const target = item.update || item;
-  $('review-title').textContent = (method === 'module.install' ? 'Update ' : 'Subscribe to ') + item.name;
-  $('review-description').textContent = 'MagicShelf will download and install it for you. Then use On / Off on its collection card.';
+  $('review-title').textContent = (item.installed && item.update ? 'Update ' : 'Subscribe to ') + item.name;
+  $('review-description').textContent = item.installed && item.update ? 'Install this update now. If the creation is On, it will restart. Your saved data is kept. Cancel to let the update install while Off.' : 'MagicShelf will download and install it for you. Then use On / Off on its collection card.';
   $('review-permissions').replaceChildren(el('h3','What this creation can do'));for(const permission of target.permission_details||[]){const row=el('div',null,'permission');row.append(el('strong',permission.title),el('p',permission.description));$('review-permissions').append(row);}
-  $('review-note').textContent = 'Creations run with access to your SteamOS account. If an update asks for more access, MagicShelf will ask you again. Future updates install automatically while subscribed.';
-  $('confirm').textContent = method === 'module.subscribe' ? (item.installed ? 'Subscribe for updates' : 'Subscribe & install') : 'Install update';
+  $('review-note').textContent = 'Creations run with access to your SteamOS account. If an update asks for more access, MagicShelf will ask you again. Future updates download automatically and install while the creation is Off.';
+  $('confirm').textContent = item.installed && item.update ? 'Install update' : item.installed ? 'Subscribe for updates' : 'Subscribe & install';
   $('review').returnValue = ''; $('review').showModal();
   $('review').onclose = () => { if ($('review').returnValue === 'confirm') act(method, {id:item.id,subscribed:true,permissions:target.permissions}); };
 }
@@ -43,7 +43,7 @@ function renderCards() {
     info.append(el('div',item.category,'card-category'),el('h3',item.name),el('p',item.description));open.append(artwork(item,'card-art'),info);card.append(open);
     const foot=el('div',null,'card-foot'),t=snapshot.transfer;
     if(t?.active&&t.id===item.id)foot.append(progress(t));
-    else if(item.installed)foot.append(el('span','Installed'),power(item));
+    else if(item.installed)foot.append(el('span',({ready:'Update ready',review:'Review update',failed:'Update needs retry',held:'Previous version kept',available:'Update available'})[item.update_status]||'Installed'),power(item));
     else foot.append(button('View creation ↗','secondary',()=>openCreation(item.id)));
     card.append(foot);cards.append(card);
   }
@@ -54,8 +54,8 @@ function settings(item) {
   if(!item.installed){panel.append(el('p','Subscribe and download this creation to configure it.','about'));return panel;}
   const power=el('div',null,'setting-row'), copy=el('div');copy.append(el('h3','On your shelf'),el('p',item.enabled?'Running and ready to use.':'Off. Your saved data is kept.'));const toggle=button('','switch',()=>act('module.toggle',{id:item.id,enabled:!item.enabled}));toggle.setAttribute('role','switch');toggle.setAttribute('aria-checked',String(item.enabled));toggle.setAttribute('aria-label','Turn '+item.name+' on or off');power.append(copy,toggle);panel.append(power);
   if(item.can_configure||item.adapter){const row=el('div',null,'setting-row'), text=el('div');text.append(el('h3','Device controls'),el('p','Brightness, size, placement and hand attachment.'));row.append(text,button('Open settings ↗','secondary',()=>act('module.open',{id:item.id})));panel.append(row,el('p','Opening device settings turns this creation on. Its controls appear on the creation in VR.','explanation'));}
-  const updates=el('div',null,'setting-row'), text=el('div');text.append(el('h3','Updates'),el('p',item.update_mode==='local'?'Local build · published packages are not available yet.':item.subscribed?'Automatically downloaded while subscribed.':'Subscribe to keep this creation up to date.'));updates.append(text);if(item.subscribed)updates.append(button('Unsubscribe','secondary',()=>act('module.subscribe',{id:item.id,subscribed:false})));else if(item.subscription_available)updates.append(button('Subscribe for updates','secondary',()=>review(item)));panel.append(updates);
-  if(item.update)panel.append(button('Review update','secondary',()=>review(item,item.subscribed?'module.subscribe':'module.install')));
+  const updates=el('div',null,'setting-row'), text=el('div');text.append(el('h3','Updates'),el('p',item.update_mode==='local'?'Local build · published packages are not available yet.':item.subscribed?'Updates download automatically and install while Off.':'Subscribe to keep this creation up to date.'));updates.append(text);if(item.subscribed)updates.append(button('Unsubscribe','secondary',()=>act('module.subscribe',{id:item.id,subscribed:false})));else if(item.subscription_available)updates.append(button('Subscribe for updates','secondary',()=>review(item)));panel.append(updates);
+  if(item.update)panel.append(button(item.update_status==='ready'?'Update now':'Review update','secondary',()=>review(item,item.subscribed?'module.subscribe':'module.install')));
   if(item.previous_version)panel.append(button('Restore previous version','secondary',()=>{if(confirm('Restore the previous version and its saved data? Your current data will be archived.'))act('module.rollback',{id:item.id});}));
   if(!item.adapter)panel.append(button('Remove download','danger',()=>{if(confirm('Remove '+item.name+' and stop its subscription? Your saved data will be kept.'))act('module.remove',{id:item.id});}));return panel;
 }
@@ -68,7 +68,7 @@ function detail(item){const section=el('section');section.append(button('← Bac
   else if(item.installed)actions.append(power(item),button('Configure creation','secondary',()=>{tab='settings';render();}));
   else if(item.subscription_available)actions.append(button('Subscribe & download','primary',()=>review(item)));
   right.append(actions);
-  right.append(el('p',item.adapter?'This creation is already installed on your device. Its downloadable release is still being prepared.':item.subscribed?'New published updates download automatically, even while this creation is Off.':'Subscribe to download this creation and receive future updates.','explanation'));
+  right.append(el('p',item.adapter?'This creation is already installed on your device. Its downloadable release is still being prepared.':item.update_note?item.update_note:'Subscribe to download this creation and receive future updates.','explanation'));
   const tabs=el('div',null,'detail-tabs');tabs.setAttribute('role','tablist');['about','settings','credits'].forEach(t=>{const b=button(t[0].toUpperCase()+t.slice(1),'',()=>{tab=t;render();});b.setAttribute('role','tab');b.setAttribute('aria-selected',String(tab===t));tabs.append(b);});right.append(tabs);const content=el('div',null,'tab-content');content.setAttribute('role','tabpanel');if(tab==='settings')content.append(settings(item));else if(tab==='credits')content.append(credits(item));else{content.append(el('p',item.about||item.description,'about'));const links=el('div',null,'links');(item.links||[]).forEach(l=>links.append(link(l.label+' ↗',l.url)));content.append(links);}right.append(content);grid.append(left,right);section.append(grid);return section;}
 function preferences(){
   const section=el('section',null,'store-settings'),intro=el('div',null,'intro');intro.append(el('h1','Settings'));section.append(intro);
