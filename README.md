@@ -23,18 +23,8 @@ The installer runs under your user account and needs no administrator password.
 It verifies the release before installing into `~/.local/share/magicshelf`.
 It does not modify the operating system or restart SteamVR.
 
-The first binary release targets **Steam Frame / Linux aarch64**, with Python
-3.12+, systemd user services, Cairo/json-c, and SteamVR installed at
-`/opt/steamvr`. x86_64 is a source build target, not a tested downloadable release.
-This is an early framework release; the installation and migration validation
-is recorded in [docs/VALIDATION.md](docs/VALIDATION.md).
-
 ## Uninstall
 
 ```sh
 python3 ~/.local/share/magicshelf/current/uninstall.py
 ```
-
-This stops MagicShelf integration and downloaded modules and keeps releases and saved
-data. Migrated phone/Digivice shells return to their standalone shelf behavior.
-Existing game and Android installations remain in their original locations.
