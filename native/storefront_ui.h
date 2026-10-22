@@ -71,14 +71,16 @@ struct StoreUI{
   }
   button(c,20,779,182,boolfield(state,"checking_updates")?"Checking...":"Check updates","catalog.refresh");text(c,27,861,"MagicShelf "+textfield(state,"version"),13,true,175);
  }
- void draw(Canvas&c,json_object*state,bool busy,const std::string&message){
+ bool setupFocused(json_object*m)const{return tab=="settings"&&boolfield(m,"installed")&&field(m,"setup")&&!boolfield(field(m,"setup"),"ready");}
+ void draw(Canvas&c,json_object*state,bool busy,const std::string&message,bool actionFailed=false){
   working=busy;buttons.clear();c.fill(0,0,0);sidebar(c,state);
   auto*m=find(state,selected);if(!selected.empty()&&!m)selected.clear();
-  if(m)text(c,254,55,"Collection / "+textfield(m,"name"),17,true,670);
+  bool setup=setupFocused(m)&&reviewId.empty();
+  if(m&&!setup)text(c,254,55,"Collection / "+textfield(m,"name"),17,true,670);
   c.rect(254,94,994,1,.08,.13,.20);
   if(!reviewId.empty())review(c,state);else if(m)detail(c,m,state);else if(view=="settings")preferences(c,state);else collection(c,state);
   auto*t=field(state,"transfer");std::string status=boolfield(t,"active")?transferLabel(t)+" · "+textfield(t,"name"):busy?"Updating your shelf... You can keep browsing.":message;
-  c.rect(254,848,994,1,.08,.13,.20);text(c,254,869,status,14,true,994);text(c,254,891,textfield(state,"update_message"),12,true,994);
+  if(!setup||actionFailed){c.rect(254,848,994,1,.08,.13,.20);text(c,254,869,actionFailed?message:status,14,true,994);if(!setup)text(c,254,891,textfield(state,"update_message"),12,true,994);}
  }
  void collection(Canvas&c,json_object*state){
   text(c,254,171,view=="discover"?"Explore the Collection":"My Shelf",38);
@@ -156,7 +158,20 @@ struct StoreUI{
   button(c,254,782,238,"Restore defaults","settings.reset",std::string("{\"group\":\"")+settingsTab+"\"}");
   text(c,518,812,settingsTab=="app"?"Changes save automatically.":"Layout changes return creations to the dock.",17,true,730);
  }
- void detail(Canvas&c,json_object*m,json_object*state){auto id=textfield(m,"id");button(c,254,112,163,"< Collection","ui.back");
+ void setupPage(Canvas&c,json_object*m){
+  button(c,254,112,130,"< Back","ui.back");art(c,m,254,183,450,534);
+  text(c,738,300,textfield(m,"name"),34,false,510);
+  auto*steps=field(field(m,"setup"),"steps");json_object*next=nullptr;size_t index=0,total=steps?json_object_array_length(steps):0;
+  for(;index<total;index++){auto*s=json_object_array_get_idx(steps,index);if(!boolfield(s,"ready")){next=s;break;}}
+  if(!next)return;
+  if(total>1)text(c,738,338,"Step "+std::to_string(index+1)+" of "+std::to_string(total),15,true,510);
+  bool downloading=json_object_get_double(field(next,"total_bytes"))>0;
+  text(c,738,410,downloading?"Setting up":"Finish setup",28);
+  if(downloading){progressBar(c,next,738,448,440);text(c,738,486,std::to_string(int(std::floor(fraction(next)*100)))+"%",17,true,510);}
+  else text(c,738,450,"Steam will download the remaining files.",18,true,510);
+  button(c,738,514,278,downloading?"Open Steam":"Continue in Steam","module.setup",argsFor(textfield(m,"id"),"appid",json_object_new_int(json_object_get_int(field(next,"appid")))),true);
+ }
+ void detail(Canvas&c,json_object*m,json_object*state){if(setupFocused(m)){setupPage(c,m);return;}auto id=textfield(m,"id");button(c,254,112,163,"< Collection","ui.back");
   art(c,m,254,183,450,534,gallery);auto*pics=field(m,"screenshots");int n=pics?json_object_array_length(pics):0;if(n){auto*p=json_object_array_get_idx(pics,gallery%n);wrap(c,266,749,428,textfield(p,"caption"),16,2);if(n>1){button(c,254,790,150,"< Previous","ui.photo-prev");button(c,554,790,150,"Next >","ui.photo-next");text(c,452,820,std::to_string(gallery%n+1)+" / "+std::to_string(n),17,true);}}
   text(c,738,200,textfield(m,"category"),14,true,510);text(c,738,247,textfield(m,"name"),37,false,510);text(c,738,277,"by "+textfield(m,"author"),17,true,510);wrap(c,738,316,504,textfield(m,"tagline").empty()?textfield(m,"description"):textfield(m,"tagline"),21,2,false);
   text(c,738,392,boolfield(m,"adapter")?"Installed locally":boolfield(m,"subscribed")?"Installed · automatic updates":boolfield(m,"installed")?"Installed":"Ready to download",16,true,510);
@@ -170,16 +185,6 @@ struct StoreUI{
   if(tab=="about"){wrap(c,738,616,508,textfield(m,"about"),18,5);auto*links=field(m,"links");for(size_t i=0;links&&i<std::min(size_t(2),json_object_array_length(links));i++){auto*l=json_object_array_get_idx(links,i);button(c,738+int(i)*260,773,248,textfield(l,"label"),"module.link",argsFor(id,"index",json_object_new_int(i)),false,48);}}
   else if(tab=="settings"){
    if(!boolfield(m,"installed")){wrap(c,738,625,508,"Subscribe and download this creation to configure it.",20,3);return;}
-   if(auto*setup=field(m,"setup");setup&&!boolfield(setup,"ready")){
-    text(c,738,621,"Let's get this ready",25);
-    auto*steps=field(setup,"steps");json_object*next=nullptr;
-    for(size_t i=0;steps&&i<json_object_array_length(steps);i++){auto*s=json_object_array_get_idx(steps,i);if(!boolfield(s,"ready")){next=s;break;}}
-    int total=steps?json_object_array_length(steps):1;int remaining=json_object_get_int(field(setup,"remaining"));
-    text(c,738,663,(total>1?std::to_string(total-remaining+1)+" of "+std::to_string(total)+": ":"")+textfield(next,"title"),21);
-    wrap(c,738,700,508,"Choose Install with Steam, finish the download there, then return here. We'll check when everything is ready.",18,3);
-    if(json_object_get_double(field(next,"total_bytes"))>0)progressBar(c,next,738,768,510);
-    button(c,738,786,510,"Install with Steam","module.setup",argsFor(id,"appid",json_object_new_int(json_object_get_int(field(next,"appid")))),true,44);return;
-   }
    text(c,738,621,"Version "+textfield(m,"version"),21);text(c,738,650,boolfield(m,"enabled")?"On. Opening device settings keeps it running.":"Ready to use. Turn it On above to begin.",16,true,508);
    if(boolfield(m,"can_configure")||boolfield(m,"adapter"))button(c,738,670,510,"Open device settings in VR","module.open",argsFor(id),false,44);
    if(!boolfield(m,"adapter")){
