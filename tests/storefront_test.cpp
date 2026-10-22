@@ -33,7 +33,16 @@ ui.local({0,0,0,0,"ui.rollback",argsFor(ui.selected)},state,method,params);check
 // Missing Steam prerequisites lead directly to a single setup action.
 json_object_object_add(download,"setup",json_tokener_parse(R"({"ready":false,"steps":[{"appid":123,"title":"Game support","ready":false,"received_bytes":20,"total_bytes":100}]})"));
 ui.selected.clear();check(ui,c,state);bool setupFound=false;for(auto b:ui.buttons)if(b.method=="ui.setup"){ui.local(b,state,method,params);setupFound=true;break;}assert(setupFound&&ui.tab=="settings");check(ui,c,state);
-for(auto b:ui.buttons)if(b.method=="module.setup"){ui.local(b,state,method,params);auto*p=json_tokener_parse(params.c_str());assert(json_object_get_int(field(p,"appid"))==123);json_object_put(p);}
+int setupActions=0;
+for(auto b:ui.buttons){
+ assert(b.method!="ui.setup"&&b.method!="ui.settings"&&b.method!="module.toggle"&&b.method.rfind("ui.tab.",0)!=0&&b.method.rfind("ui.photo-",0)!=0);
+ if(b.method=="module.setup"){setupActions++;assert(ui.local(b,state,method,params));auto*p=json_tokener_parse(params.c_str());assert(json_object_get_int(field(p,"appid"))==123);json_object_put(p);}
+}
+assert(setupActions==1);
+// Finishing one dependency advances the same action; completion restores controls.
+auto*setup=field(download,"setup");auto*steps=field(setup,"steps");json_object_object_add(json_object_array_get_idx(steps,0),"ready",json_object_new_boolean(true));json_object_array_add(steps,json_tokener_parse(R"({"appid":456,"ready":false})"));check(ui,c,state);
+setupActions=0;for(auto b:ui.buttons)if(b.method=="module.setup"){setupActions++;auto*p=json_tokener_parse(b.params.c_str());assert(json_object_get_int(field(p,"appid"))==456);json_object_put(p);}assert(setupActions==1);
+json_object_object_add(setup,"ready",json_object_new_boolean(true));check(ui,c,state);bool powerRestored=false;for(auto b:ui.buttons){assert(b.method!="module.setup");powerRestored|=b.method=="module.toggle";}assert(powerRestored);
 json_object_object_del(download,"setup");
 ui.selected.clear();auto*list=field(state,"modules");for(int i=0;i<9;i++){auto*m=json_tokener_parse(R"({"name":"A very long creation name to check clipping","description":"Long descriptions remain inside their own creation card and never cover another card's controls.","category":"Creations","installed":true})");json_object_object_add(m,"id",json_object_new_string(("org.test.extra"+std::to_string(i)).c_str()));json_object_array_add(list,m);}for(auto v:{"discover","library"}){ui.view=v;for(int page=0;page<4;page++){ui.page=page;check(ui,c,state);}}
 // Trigger presses commit on release over the same target. Page navigation stays

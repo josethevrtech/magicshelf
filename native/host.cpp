@@ -95,7 +95,7 @@ void dashboard(){
    ui.hover=input.hover;ui.pressed=input.pressed;
    if(!damage.empty()){
     cairo_save(canvas.c);cairo_rectangle(canvas.c,damage.x,damage.y,damage.right-damage.x,damage.bottom-damage.y);cairo_clip(canvas.c);
-    ui.draw(canvas,j,working,failure.empty()?textfield(j,"message"):failure);cairo_restore(canvas.c);
+    ui.draw(canvas,j,working,failure.empty()?textfield(j,"message"):failure,!failure.empty());cairo_restore(canvas.c);
     gpu.update(canvas,damage.x*RenderScale,damage.y*RenderScale,(damage.right-damage.x)*RenderScale,(damage.bottom-damage.y)*RenderScale);gpu.present(o,panel);
     frames++;if(full)fullFrames++;else partialFrames++;
     double ms=std::chrono::duration<double,std::milli>(Clock::now()-started).count();peakMs=std::max(peakMs,ms);

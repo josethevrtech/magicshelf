@@ -631,7 +631,7 @@ class Manager(Updates):
     def setup_step(self, key, appid):
         require(key in self.state['modules'] and not self.is_adapter(key), 'Download this creation first.')
         setup.open_step(self.metadata(key, self.state['modules'][key]), self.home, appid)
-        self.message = 'Finish the download in Steam, then return here. We will check when it is ready.'
+        self.message = 'Setup opened in Steam.'
         self.publish()
         return self.snapshot()
 

@@ -1,6 +1,6 @@
 # Exclusive testing readiness
 
-MagicShelf 0.3.9 provides a graphical installer, guided creation setup and an
+MagicShelf 0.3.10 provides a graphical installer, guided creation setup and an
 in-app framework updater for Steam Frame. Creations retain independent repositories
 and subscriptions. Every creation is available without payment or an account.
 
@@ -10,7 +10,7 @@ and subscriptions. Every creation is available without payment or an account.
    shows progress, verifies its download and offers **Open MagicShelf** when ready.
 2. Choose a creation, read its plain-language permissions and select
    **Subscribe & download**. Installation finishes automatically.
-3. If **Set up** appears, select it and choose **Install with Steam** for the
+3. If **Set up** appears, select it and choose **Continue in Steam** for the
    missing support download. Finish Steam's normal dialog and return to MagicShelf.
    The app detects download progress and completion; no folder selection or
    terminal commands are needed.
