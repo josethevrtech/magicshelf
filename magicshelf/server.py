@@ -10,7 +10,7 @@ from pathlib import Path
 from .manager import Manager, atomic
 
 def dispatch(manager, packet):
-    if packet.get("api_version") != 1:
+    if packet.get("api_version") not in (1, 2):
         raise ValueError("Unsupported MagicShelf API version")
     method, p = packet.get("method"), packet.get("params", {})
     if not isinstance(p, dict):
@@ -22,18 +22,32 @@ def dispatch(manager, packet):
             raise ValueError("Invalid module session")
         manager.ready.add(key)
         return {"accepted": True}
+    if manager.framework.snapshot().get('stage') == 'installing' and method not in ('snapshot', 'modules.bootstrap'):
+        raise ValueError('MagicShelf is updating. It will reopen in a moment.')
+    def check_updates():
+        result = manager.request_update_check()
+        threading.Thread(target=manager.framework.check, daemon=True).start()
+        return result
     actions = {
         "snapshot": lambda: manager.snapshot(),
         "modules.adopt": lambda: manager.adopt(),
         "modules.bootstrap": lambda: manager.bootstrap(),
+        "framework.install": lambda: manager.framework.install(),
+        "module.setup": lambda: manager.setup_step(p["id"], p["appid"]),
         "module.open": lambda: manager.open(p["id"]),
         "module.toggle": lambda: manager.toggle(p["id"], p["enabled"]),
-        "module.install": lambda: manager.install(p["id"], p.get("permissions")),
+        "module.subscribe": lambda: manager.subscribe(p["id"], False) if p.get("subscribed") is False else manager.request_install(method, p),
+        "module.link": lambda: manager.open_link(p["id"], p["index"]),
+        "module.install": lambda: manager.request_install(method, p),
         "module.remove": lambda: manager.remove(p["id"]),
         "module.rollback": lambda: manager.rollback(p["id"]),
         "catalog.add": lambda: manager.add_catalog(p["url"]),
-        "catalog.refresh": lambda: manager.refresh(),
+        "catalog.refresh": check_updates,
+        "subscriptions.sync": check_updates,
         "home": lambda: manager.home_all(),
+        "settings.update": lambda: manager.update_settings(p.get("changes")),
+        "settings.reset": lambda: manager.reset_settings(p.get("group")),
+        "app.link": lambda: manager.app_link(p.get("index")),
     }
     if method not in actions:
         raise ValueError("Unknown MagicShelf method")
@@ -60,7 +74,7 @@ def serve():
 
     class Handler(socketserver.StreamRequestHandler):
         def handle(self):
-            self.request.settimeout(100)
+            self.request.settimeout(240)
             try:
                 line = self.rfile.readline(65537)
                 if len(line) > 65536 or not line.endswith(b"\n"):
@@ -95,6 +109,12 @@ def serve():
         def do_GET(self):
             if not self.trusted():
                 return self.send(403, b'{}')
+            if self.path.startswith("/media/"):
+                from .storefront import media_path
+                try:
+                    return self.send(200, media_path(self.path, manager.root).read_bytes(), "image/png")
+                except (OSError, ValueError):
+                    return self.send(404, b'{}')
             filename = {"/": "index.html", "/app.js": "app.js", "/style.css": "style.css"}.get(self.path)
             if not filename:
                 return self.send(404, b'{}')
@@ -129,7 +149,22 @@ def serve():
                 print("MagicShelf state:", e, flush=True)
             time.sleep(1)
     threading.Thread(target=publish, daemon=True).start()
+    manager.framework.recover_after_restart()
     threading.Thread(target=manager.reconcile, daemon=True).start()
+    def subscriptions():
+        # No application scheduler or cron entry is needed: the installed manager
+        # follows subscriptions for as long as the user's session is running.
+        time.sleep(10)
+        while True:
+            try:
+                if not manager.busy:
+                    manager.sync_subscriptions()
+                    manager.framework.check()
+            except Exception as error:
+                manager.update_message = "Automatic updates will retry: " + str(error)[:180]
+            # Check promptly after a failed download or a temporary offline period.
+            time.sleep(60 if manager.catalog_errors or manager.state['update_errors'] else 5 * 60)
+    threading.Thread(target=subscriptions, daemon=True).start()
     try:
         server.serve_forever()
     finally:

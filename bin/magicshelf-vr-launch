@@ -1,3 +1,6 @@
 #!/usr/bin/env python3
+"""Open MagicShelf's native SteamVR dashboard on SteamOS / Steam Frame."""
 import subprocess
-subprocess.run(["systemctl", "--user", "start", "magicshelf.service", "magicshelf-vr.service"], check=True)
+from pathlib import Path
+subprocess.run(["systemctl", "--user", "start", "steamvr.service", "magicshelf.service", "magicshelf-vr.service"], check=True)
+subprocess.run([str(Path(__file__).resolve().parent / "magicshelf-vr"), "--show"], check=True)

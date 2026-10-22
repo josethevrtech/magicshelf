@@ -10,7 +10,7 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 from magicshelf.contracts import ContractError, catalog, manifest, machine
-from magicshelf.manager import Manager, atomic
+from magicshelf.manager import ADAPTERS, Manager, System, atomic
 from magicshelf.packages import check_url, unpack
 from magicshelf.server import dispatch
 
@@ -31,14 +31,26 @@ class FakeSystem:
     def __init__(self):
         self.calls = []
         self.running = set()
+        self.frozen = set()
+        self.paused_containers = set()
     def call(self, *args, **kwargs):
         self.calls.append(args)
         if args[0] == "start":
             self.running.update(args[1:])
         if args[0] == "stop" or (args[0] == "disable" and "--now" in args):
             self.running.difference_update(args[1:])
+        if args[0] == "freeze":
+            self.frozen.update(args[1:])
+        if args[0] == "thaw":
+            self.frozen.difference_update(args[1:])
     def active(self, unit):
         return unit in self.running
+    def pause_container(self, name, paused):
+        self.calls.append(("pause-container", name, paused))
+        if paused:
+            self.paused_containers.add(name)
+        else:
+            self.paused_containers.discard(name)
 
 class FrameworkTests(unittest.TestCase):
     def setUp(self):
@@ -51,29 +63,129 @@ class FrameworkTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def test_adapter_toggle_keeps_capture_process_and_redocks(self):
-        key = "org.magicshelf.android-phone"
-        self.manager.legacy.mkdir(parents=True)
+    def adapter(self, key, enabled=True):
+        self.manager.legacy.mkdir(parents=True, exist_ok=True)
         (self.manager.legacy / "magicshelf-api-version").write_text("2")
-        self.manager.state["modules"][key] = {"version":"0.1.0", "enabled":True, "adapter":True}
+        self.manager.state["modules"][key] = {"version":"0.1.0", "enabled":enabled, "adapter":True}
         unit = self.manager.unit(key)
-        self.system.running.add(unit)
+        self.system.running.update([unit, "steamvr.service", *ADAPTERS[key]["backends"]])
+        return unit
+
+    def test_adapter_toggle_pauses_runtime_keeps_capture_and_redocks(self):
+        key = "org.magicshelf.android-phone"
+        unit = self.adapter(key)
         with patch("magicshelf.manager.subprocess.run") as run:
-            self.manager.toggle(key, False)
+            result = self.manager.toggle(key, False)
             self.assertTrue(self.system.active(unit))
+            self.assertFalse(result["modules"][0]["running"])
+            self.assertEqual(self.system.frozen, set(ADAPTERS[key]["backends"]))
+            self.assertEqual(self.system.paused_containers, {"lepton-courage-tablet"})
+            self.assertIn(("disable", unit, *ADAPTERS[key]["backends"]), self.system.calls)
             self.assertEqual(run.call_args.args[0][-1], "--hide")
             self.manager.reconcile()
             self.assertTrue(self.system.active(unit))
+            self.assertEqual(self.system.frozen, set(ADAPTERS[key]["backends"]))
             self.manager.toggle(key, True)
+            self.assertFalse(self.system.frozen)
+            self.assertFalse(self.system.paused_containers)
             self.assertEqual(run.call_args.args[0][-1], "--dock")
         self.assertNotIn(("disable", "--now", unit), self.system.calls)
         self.assertNotIn(("start", unit), self.system.calls)
+
+    def test_digivice_off_does_not_pause_phone_or_other_apps(self):
+        phone = "org.magicshelf.android-phone"
+        pet = "org.magicshelf.digital-partner"
+        self.adapter(phone)
+        self.adapter(pet)
+        with patch("magicshelf.manager.subprocess.run"):
+            self.manager.toggle(pet, False)
+        self.assertEqual(self.system.frozen, {"digitalpartner.service"})
+        self.assertFalse(self.system.paused_containers)
+        self.assertTrue(self.manager.state["modules"][phone]["enabled"])
+
+    def test_resume_after_manager_restart_does_not_move_enabled_creation(self):
+        key = "org.magicshelf.android-phone"
+        self.adapter(key)
+        self.system.frozen.update(ADAPTERS[key]["backends"])
+        self.system.paused_containers.add("lepton-courage-tablet")
+        self.manager.save()
+        restored = Manager(self.home, self.path / "runtime", self.system)
+        with patch("magicshelf.manager.subprocess.run") as run:
+            restored.reconcile()
+        self.assertFalse(self.system.frozen)
+        self.assertFalse(self.system.paused_containers)
+        run.assert_not_called()
+
+    def test_off_reconciliation_works_without_capture_shell(self):
+        key = "org.magicshelf.android-phone"
+        unit = self.adapter(key, False)
+        self.system.running.remove(unit)
+        with patch("magicshelf.manager.subprocess.run") as run:
+            self.manager.reconcile()
+        self.assertEqual(self.system.frozen, set(ADAPTERS[key]["backends"]))
+        self.assertEqual(self.system.paused_containers, {"lepton-courage-tablet"})
+        run.assert_not_called()
+
+    def test_failed_off_restores_enabled_execution(self):
+        key = "org.magicshelf.android-phone"
+        self.adapter(key)
+        pause = self.system.pause_container
+        def fail_pause(name, paused):
+            if paused:
+                raise RuntimeError("container pause failed")
+            pause(name, paused)
+        with patch.object(self.system, "pause_container", side_effect=fail_pause), patch("magicshelf.manager.subprocess.run"), self.assertRaisesRegex(RuntimeError, "container pause failed"):
+            self.manager.toggle(key, False)
+        self.assertTrue(self.manager.state["modules"][key]["enabled"])
+        self.assertFalse(self.system.frozen)
+
+    def test_failed_on_returns_to_paused_state(self):
+        key = "org.magicshelf.android-phone"
+        self.adapter(key, False)
+        def command(args, **kwargs):
+            if args[-1] == "--dock":
+                raise RuntimeError("dock failed")
+        with patch("magicshelf.manager.subprocess.run", side_effect=command), self.assertRaisesRegex(RuntimeError, "dock failed"):
+            self.manager.toggle(key, True)
+        self.assertFalse(self.manager.state["modules"][key]["enabled"])
+        self.assertEqual(self.system.frozen, set(ADAPTERS[key]["backends"]))
+        self.assertEqual(self.system.paused_containers, {"lepton-courage-tablet"})
+
+    def test_phone_off_does_not_pause_digivice(self):
+        phone = "org.magicshelf.android-phone"
+        pet = "org.magicshelf.digital-partner"
+        self.adapter(phone)
+        self.adapter(pet)
+        with patch("magicshelf.manager.subprocess.run"):
+            self.manager.toggle(phone, False)
+        self.assertEqual(self.system.frozen, set(ADAPTERS[phone]["backends"]))
+        self.assertTrue(self.manager.state["modules"][pet]["enabled"])
+
+    def test_container_operations_are_scoped_and_idempotent(self):
+        name = "lepton-courage-tablet"
+        container = {"Names": [name], "Labels": {"lepton": "true"}, "Id": "exact-container-id", "State": "running"}
+        unrelated = {**container, "Names": [name + "-other"], "Id": "other"}
+        for state, paused, operation in [("running", True, "pause"), ("paused", True, None), ("paused", False, "unpause"), ("running", False, None), ("exited", True, None)]:
+            with self.subTest(state=state, paused=paused), patch("magicshelf.manager.subprocess.run") as run:
+                run.return_value.stdout = json.dumps([unrelated, {**container, "State": state}])
+                System().pause_container(name, paused)
+                self.assertEqual(run.call_count, 2 if operation else 1)
+                if operation:
+                    self.assertEqual(run.call_args.args[0], ["podman", operation, "exact-container-id"])
+        with patch("magicshelf.manager.subprocess.run") as run:
+            run.return_value.stdout = "[]"
+            System().pause_container(name, True)
+            self.assertEqual(run.call_count, 1)
+
+    def test_container_inspection_failure_is_not_silent_success(self):
+        with patch("magicshelf.manager.subprocess.run", side_effect=subprocess.CalledProcessError(125, "podman")), self.assertRaises(subprocess.CalledProcessError):
+            System().pause_container("lepton-courage-tablet", True)
 
     def test_supported_contract(self):
         self.assertEqual(manifest(meta())["api_version"], 1)
 
     def test_reject_incompatible_modules_before_install(self):
-        for key, value in [("api_version", 2), ("schema_version", True), ("entrypoint", "../run"), ("permissions", ["root"]), ("architecture", "any"), ("version", "latest"), ("memory_mb", 4096)]:
+        for key, value in [("api_version", 3), ("schema_version", True), ("entrypoint", "../run"), ("permissions", ["root"]), ("architecture", "any"), ("version", "latest"), ("memory_mb", 4096)]:
             with self.subTest(key=key):
                 item = meta();item[key] = value
                 with self.assertRaises(ContractError):

@@ -10,10 +10,14 @@
 #include <sys/file.h>
 #include <unistd.h>
 
+inline bool dockResetEvent(uint32_t type){
+ return type==vr::VREvent_ResetDashboard||type==vr::VREvent_SeatedZeroPoseReset||type==vr::VREvent_StandingZeroPoseReset||type==vr::VREvent_ChaperoneUniverseHasChanged||type==vr::VREvent_ChaperoneRoomSetupCommitted;
+}
+
 struct ObjectDock {
  vr::IVROverlay*overlay;vr::VROverlayHandle_t background=0;int owner=-1;
  std::string base,moduleKey=DeviceKey,anchorKey="valve.steam.gamepadui.bar";DockLayout layout,effective;
- bool shelfOwner=true;
+ bool shelfOwner=true,configured=false,homeRequested=false;
  int slot=AndroidOnly?0:1;M anchor=identity(),slotPose=identity();bool available=false,anchorValid=false,repaint=true;
  struct RailSection {vr::VROverlayHandle_t handle=0;M pose{};float width=0;bool shown=false,placed=false;};
  std::vector<RailSection> sections;
@@ -48,8 +52,11 @@ struct ObjectDock {
   }else valid=false;
   json_object_put(j);configTime=t;
   if(!valid){std::cerr<<"Power Toys: invalid configuration; keeping previous layout\n";return;}
-  layout=candidate;anchorKey=key;slot=index;repaint=true;
+  if(configured&&(!layout.samePlacement(candidate)||anchorKey!=key||slot!=index))homeRequested=true;
+  configured=true;layout=candidate;anchorKey=key;slot=index;repaint=true;
  }
+ bool takeHomeRequest(){bool requested=homeRequested;homeRequested=false;return requested;}
+ bool canSnap(M creation,float userSize,bool expanded=false)const{return available&&effective.acceptsDrop(anchor,creation,userSize,expanded);}
  bool refresh(){
   reload();available=false;anchorValid=false;if(!overlay->IsDashboardVisible())return false;
   vr::VROverlayHandle_t bar=0;vr::HmdVector2_t scale{};

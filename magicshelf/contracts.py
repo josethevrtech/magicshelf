@@ -2,12 +2,15 @@
 import json
 import platform
 import re
+from urllib.parse import urlsplit
 from pathlib import PurePosixPath
 
 ID = re.compile(r"^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$")
 VERSION = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
-PERMISSIONS = {"vr-overlay", "network", "user-files"}
+PERMISSIONS = {"vr-overlay", "network", "user-files", "external-runtime"}
 MAX_MODULES = 16
+MAX_PACKAGE_BYTES = 1024 * 1024 * 1024
+MAX_EXPANDED_BYTES = 2 * 1024 * 1024 * 1024
 
 class ContractError(ValueError):
     pass
@@ -29,10 +32,34 @@ def relative(value):
 def machine():
     return {"arm64": "aarch64", "amd64": "x86_64"}.get(platform.machine().lower(), platform.machine().lower())
 
+def external_url(value):
+    require(isinstance(value, str) and len(value) <= 2048 and not any(ord(c) < 32 for c in value), "Invalid link")
+    url = urlsplit(value)
+    require(url.scheme == "https" and url.hostname and "." in url.hostname and not url.username and not url.password and url.port in (None, 443), "Links must use HTTPS")
+    return value
+
+def presentation(data):
+    for field, limit in (("category", 40), ("tagline", 120), ("about", 2000)):
+        if field in data:
+            require(isinstance(data[field], str) and len(data[field]) <= limit, "Invalid " + field)
+    for field, limit in (("screenshots", 6), ("links", 8), ("credits", 8)):
+        items = data.get(field, [])
+        require(isinstance(items, list) and len(items) <= limit, "Invalid " + field)
+        for item in items:
+            require(isinstance(item, dict), "Invalid " + field + " entry")
+            required = ("url",) if field == "screenshots" else (("label", "url") if field == "links" else ("name", "role"))
+            require(all(isinstance(item.get(k), str) and item[k] for k in required), "Incomplete " + field + " entry")
+            for k, value in item.items():
+                if k in ("url", "support_url"):
+                    external_url(value)
+                elif k in ("name", "label", "role", "caption", "license"):
+                    require(isinstance(value, str) and len(value) <= 300, "Invalid presentation text")
+    require(data.get("price", 0) == 0, "MagicShelf creations are free")
+
 def manifest(data):
     require(isinstance(data, dict), "Module manifest must be an object")
     require(data.get("schema_version") == 1 and type(data.get("schema_version")) is int, "Unsupported module schema")
-    require(type(data.get("api_version")) is int and data["api_version"] == 1, "This module needs a different MagicShelf API")
+    require(type(data.get("api_version")) is int and data["api_version"] in (1, 2), "This module needs a different MagicShelf API")
     require(isinstance(data.get("id"), str) and ID.fullmatch(data["id"]), "Invalid module ID")
     version(data.get("version"))
     require(isinstance(data.get("name"), str) and 1 <= len(data["name"]) <= 80, "Invalid module name")
@@ -44,8 +71,28 @@ def manifest(data):
     relative(data.get("entrypoint"))
     require(isinstance(data.get("permissions"), list) and all(p in PERMISSIONS for p in data["permissions"]), "Unknown module permission")
     require(len(set(data["permissions"])) == len(data["permissions"]), "Duplicate permission")
-    require("vr-overlay" in data["permissions"], "A toy must declare vr-overlay")
-    require(type(data.get("memory_mb", 256)) is int and 32 <= data.get("memory_mb", 256) <= 1024, "Invalid memory budget")
+    require("vr-overlay" in data["permissions"], "A creation must declare vr-overlay")
+    require(type(data.get("memory_mb", 256)) is int and 32 <= data.get("memory_mb", 256) <= (4096 if data["api_version"] == 2 else 1024), "Invalid memory budget")
+    if data['api_version'] == 1:
+        require('external-runtime' not in data['permissions'] and not any(k in data for k in ('control_entrypoint', 'cleanup_entrypoint', 'startup_timeout_sec')), 'Runtime lifecycle features need module API 2')
+    for field in ('control_entrypoint', 'cleanup_entrypoint'):
+        if field in data:
+            relative(data[field])
+    require(type(data.get('startup_timeout_sec', 20)) is int and 20 <= data.get('startup_timeout_sec', 20) <= 180, 'Invalid startup timeout')
+    if 'minimum_framework_version' in data:
+        version(data['minimum_framework_version'])
+    requirements = data.get('steam_requirements', [])
+    require(isinstance(requirements, list) and len(requirements) <= 4, 'Invalid setup requirements')
+    require(not requirements or data['api_version'] == 2, 'Setup requirements need API 2')
+    ids = set()
+    for item in requirements:
+        require(isinstance(item, dict) and type(item.get('appid')) is int and 0 < item['appid'] <= 100000000 and item['appid'] not in ids, 'Invalid Steam requirement')
+        ids.add(item['appid'])
+        require(isinstance(item.get('title'), str) and 1 <= len(item['title']) <= 60, 'Invalid setup title')
+        require(isinstance(item.get('files'), list) and 1 <= len(item['files']) <= 8, 'Invalid setup files')
+        for name in item['files']:
+            relative(name)
+    presentation(data)
     return data
 
 def catalog(data):
@@ -59,7 +106,7 @@ def catalog(data):
         require(identity not in seen, "Duplicate catalog module architecture")
         seen.add(identity)
         require(isinstance(item.get("sha256"), str) and re.fullmatch(r"[a-f0-9]{64}", item["sha256"]), "Missing SHA-256")
-        require(isinstance(item.get("size_bytes"), int) and 0 < item["size_bytes"] <= 100 * 1024 * 1024, "Invalid download size")
+        require(isinstance(item.get("size_bytes"), int) and 0 < item["size_bytes"] <= MAX_PACKAGE_BYTES, "Invalid download size")
         require(isinstance(item.get("url"), str), "Missing package URL")
     return data
 

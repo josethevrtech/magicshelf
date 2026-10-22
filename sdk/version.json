@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "sdk_version": "1.0.0",
+  "module_api_version": 1,
+  "local_adapter_version": 2,
+  "targets": [
+    "steamos-aarch64",
+    "steamos-x86_64"
+  ],
+  "headers": [
+    "native/magicshelf_sdk.h",
+    "native/compat/openvr.h",
+    "native/compat/profile.h",
+    "native/compat/render.h",
+    "native/compat/placement.h",
+    "native/compat/dock_layout.h",
+    "native/compat/object_dock.h"
+  ],
+  "module_api_versions": [
+    1,
+    2
+  ]
+}

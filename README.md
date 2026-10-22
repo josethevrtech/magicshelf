@@ -14,7 +14,7 @@ Built for **SteamOS and Steam Frame ONLY**.
 
 ## Install
 
-In Desktop Mode, download [Install.MagicShelf.desktop](https://github.com/josethevrtech/magicshelf/releases/download/v0.1.3/Install.MagicShelf.desktop)
+In Desktop Mode, download [Install.MagicShelf.desktop](https://github.com/josethevrtech/magicshelf/releases/download/v0.3.9/Install.MagicShelf.desktop)
 to your desktop and double-click it. If your desktop asks whether to execute or
 trust the downloaded launcher, allow it. Open the new **MagicShelf** shortcut or
 select **MagicShelf** in SteamVR's dashboard.

@@ -28,7 +28,7 @@ class InstallerTests(unittest.TestCase):
             self.calls.append(args)
             return types.SimpleNamespace(returncode=1 if args[0]=="is-active" else 0)
         self.original_is_file = Path.is_file
-        self.patches = [patch.object(Path,"home",return_value=self.home), patch.object(Path,"is_file",lambda p: True if str(p).startswith("/opt/steamvr/") else self.original_is_file(p)), patch.object(installer,"system",side_effect=system), patch("magicshelf.client.request",return_value={"api_version":1})]
+        self.patches = [patch.object(Path,"home",return_value=self.home), patch.object(Path,"is_file",lambda p: True if str(p).startswith("/opt/steamvr/") else self.original_is_file(p)), patch.object(installer,"system",side_effect=system), patch("magicshelf.client.request",return_value={"api_version":1,"version":"0.1.0"})]
         for p in self.patches:p.start()
     def tearDown(self):
         for p in reversed(self.patches):p.stop()
@@ -50,6 +50,19 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse((self.home / ".local/share/magicshelf/current").exists())
         self.assertIn(("disable","--now","magicshelf-vr.service","magicshelf.service"),self.calls)
         self.assertFalse((self.home / ".config/systemd/user/magicshelf.service").exists())
+    def test_new_dashboard_must_render_before_update_is_accepted(self):
+        root = self.home / '.local/share/magicshelf';root.mkdir(parents=True)
+        old = root / 'releases/0.0.1';old.mkdir(parents=True)
+        (root / 'current').symlink_to(old)
+        def system(*args, **kwargs):
+            self.calls.append(args)
+            return types.SimpleNamespace(returncode=0,stdout='123\n')
+        with patch.object(installer,'system',side_effect=system),patch.object(installer.time,'sleep'),patch.object(installer.subprocess,'run',return_value=types.SimpleNamespace(returncode=0)):
+            with self.assertRaisesRegex(RuntimeError,'could not open'):
+                installer.install(self.source)
+        self.assertEqual((root/'current').resolve(),old)
+        self.assertFalse(any('steamvr.service' in call and call[0]=='restart' for call in self.calls))
+
     def test_failed_framework_update_restores_previous_release_and_units(self):
         root = self.home / ".local/share/magicshelf";root.mkdir(parents=True)
         old = root / "releases/0.0.1";old.mkdir(parents=True)

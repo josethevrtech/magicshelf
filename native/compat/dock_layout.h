@@ -46,6 +46,22 @@ struct DockLayout {
  float lipHeight()const{return height()*.08f;}
  M shelfPart(M anchor,int part)const{M t=identity();t[12]=-width()/2;if(part==0)return mm(seam(anchor),mm(t,pitch(-90)));t[13]=-lipHeight()/2;t[14]=height()/2;return mm(seam(anchor),t);}
 
+ bool samePlacement(const DockLayout&d)const{
+  return spacing==d.spacing&&objectHeight==d.objectHeight&&rightEdge==d.rightEdge&&centerY==d.centerY&&depth==d.depth&&railHeight==d.railHeight&&leanDegrees==d.leanDegrees&&footInset==d.footInset&&frontOffset==d.frontOffset&&edgePadding==d.edgePadding&&joinYaw==d.joinYaw&&joinPitch==d.joinPitch&&joinRoll==d.joinRoll&&curveRadius==d.curveRadius&&curvePitch==d.curvePitch&&shelf==d.shelf&&count==d.count;
+ }
+ // Accept a drop anywhere over the dock; ordering and the home slot stay fixed.
+ bool acceptsDrop(M anchor,M creation,float size,bool expanded=false)const{
+  if(count<=0||!validRoomPose(anchor)||!validRoomPose(creation)||!std::isfinite(size)||size<=0)return false;
+  float scale=objectHeight/.18f,margin=(expanded?.065f:.04f)*scale;
+  V center=point(creation,{0,0,0}),foot=point(creation,{0,-BodyY*size,0});
+  for(int i=0;i<count;i++){
+   M inv=inverse(slot(anchor,i));V c=point(inv,center),f=point(inv,foot);
+   auto inside=[&](V p,float top){return std::abs(p[0])<=spacing*.5f+margin&&p[1]>=-.06f*scale&&p[1]<=top&&std::abs(p[2])<=(expanded?.15f:.12f)*scale;};
+   if(inside(c,objectHeight+.08f*scale)||inside(f,.08f*scale))return true;
+  }
+  return false;
+ }
+
 };
 bool dockVisible(bool dashboard,bool anchorVisible,bool active,bool launcherOnly){return dashboard&&(!launcherOnly||(anchorVisible&&active));}
 float dockObjectSize(float userSize,float height){return std::min(userSize,height/(2*BodyY));}

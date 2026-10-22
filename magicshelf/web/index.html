@@ -1,10 +1,17 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MagicShelf</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head><body>
-<header><div class="brand"><span class="mark" aria-hidden="true">▣</span><div><h1>MagicShelf</h1><p>Your shelf. Your toys.</p></div></div><button id="home">Return toys home</button></header>
-<main><nav aria-label="Library view"><button id="library" aria-pressed="true">My toys</button><button id="discover" aria-pressed="false">Discover</button></nav>
-<div class="heading"><div><h2 id="title">Your collection</h2><p id="subtitle">Choose what belongs on your shelf.</p></div><button id="refresh">Check for updates</button></div>
-<p id="notice" role="status" aria-live="polite">Connecting to MagicShelf…</p><div id="toys"></div>
-<section class="follow"><h2>Follow a collection</h2><p>Following checks a publisher’s catalog. Each toy installs only when you choose it.</p><form id="follow"><label for="url">GitHub catalog URL</label><div class="field"><input id="url" type="url" required value="https://raw.githubusercontent.com/josethevrtech/magicshelf/main/catalog.json"><button type="submit">Follow collection</button></div></form><ul id="catalogs"></ul></section>
-<footer id="version"></footer></main>
-<dialog id="review"><form method="dialog"><h2 id="review-title">Add toy</h2><p id="review-description"></p><p id="review-permissions"></p><p class="muted">This module runs code as your Linux user. Only install toys from publishers you trust.</p><div class="dialog-actions"><button value="cancel">Cancel</button><button id="confirm" value="install" class="primary">Install toy</button></div></form></dialog>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MagicShelf</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<aside class="sidebar">
+  <a class="brand" href="#" id="brand"><span class="brand-mark" aria-hidden="true">M</span><span>MagicShelf</span></a>
+  <nav aria-label="Main navigation"><button id="discover" class="nav-item" aria-pressed="true"><span aria-hidden="true">◈</span> Discover</button><button id="library" class="nav-item" aria-pressed="false"><span aria-hidden="true">▤</span> My Shelf <span id="shelf-count" class="count">0</span></button><button id="preferences" class="nav-item" aria-pressed="false">Settings</button></nav>
+  <section id="downloads" aria-label="Downloads"></section>
+  <div class="sidebar-bottom"><button id="refresh" class="quiet">Check for updates</button><small id="version"></small></div>
+</aside>
+<main id="main">
+  <header class="topbar"><span id="breadcrumb"></span></header>
+  <div id="content"></div>
+  <div class="notice-wrap"><p id="notice" role="status" aria-live="polite">Connecting to your shelf…</p><p id="update-status"></p></div>
+</main>
+<dialog id="review" aria-labelledby="review-title"><form method="dialog"><h2 id="review-title"></h2><p id="review-description"></p><div id="review-permissions" class="permission-note"></div><p id="review-note"></p><div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button id="confirm" value="confirm" class="primary">Subscribe & download</button></div></form></dialog>
 </body></html>
