@@ -1,10 +1,8 @@
 # MagicShelf
 
-MagicShelf is a home for my VR creations. Subscribe to your favorites and make your shelf your own.
+MagicShelf is a home for the random experiments I (@josethevrtech) work on. Subscribe to your favorites and make your shelf your own.
 
-Built for **SteamOS and Steam Frame only**. Browse the native SteamVR collection, open a creation for
-screenshots and settings, and find its project links and artist credits.
-Subscriptions download published creations and keep them up to date.
+Built for **SteamOS and Steam Frame ONLY**. B
 
 ## See MagicShelf
 
