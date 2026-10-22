@@ -10,9 +10,9 @@ Subscriptions download published creations and keep them up to date.
 
 A look at the **0.3.6 development build** on Steam Frame. The public installer below is still **0.1.3**.
 
-[![Watch the MagicShelf feature tour](https://github.com/user-attachments/assets/dd44f9fe-1504-4130-92c3-9fde3a417a05)](https://github.com/user-attachments/assets/248b157f-ed88-482c-b1fb-77fa95a09a1a)
+[![Watch the MagicShelf feature tour](https://github.com/user-attachments/assets/a3043c97-b729-4f46-8c98-a9f49aa84bb7)](https://github.com/user-attachments/assets/b95519ce-6af4-4641-800a-8c65aad8a6dd)
 
-**[Watch the 48-second feature tour with music](https://github.com/user-attachments/assets/248b157f-ed88-482c-b1fb-77fa95a09a1a)** — explore creations, card On/Off controls, artist credits, permission reviews, automatic downloads and shelf customization.
+**[Watch the 48-second feature tour with music](https://github.com/user-attachments/assets/b95519ce-6af4-4641-800a-8c65aad8a6dd)** — explore creations, card On/Off controls, artist credits, permission reviews, automatic downloads and shelf customization.
 
 | Discover | Creation details |
 | --- | --- |
