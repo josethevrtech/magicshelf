@@ -170,7 +170,7 @@ WantedBy=steamvr.service
         app.write_text('[Desktop Entry]\nType=Application\nName=MagicShelf\nComment=A home for my VR creations.\nExec="' + executable + '" open\nIcon=com.josethevrtech.magicshelf\nTerminal=false\nCategories=Game;\n')
         uninstall = home / '.local/share/applications/com.josethevrtech.magicshelf.uninstall.desktop'
         uninstaller = str(current/'uninstall.py').replace('\\', '\\\\').replace('"', '\\"').replace('%', '%%').replace('$', '\\$').replace('`', '\\`')
-        uninstall.write_text('[Desktop Entry]\nType=Application\nName=Uninstall MagicShelf\nComment=Remove MagicShelf and keep saved data\nExec=python3 "'+uninstaller+'" --gui\nIcon=com.josethevrtech.magicshelf\nTerminal=false\nCategories=Game;\n')
+        uninstall.write_text('[Desktop Entry]\nType=Application\nName=Uninstall MagicShelf\nComment=Remove MagicShelf and choose whether to keep your data\nExec=python3 "'+uninstaller+'" --gui\nIcon=com.josethevrtech.magicshelf\nTerminal=false\nCategories=Game;\n')
         desktop = home / "Desktop"
         try:
             result = subprocess.run(['xdg-user-dir', 'DESKTOP'], capture_output=True, text=True, timeout=5)

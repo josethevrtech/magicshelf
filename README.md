@@ -27,9 +27,13 @@ panel is closed. Subscribed creations update while Off, keeping their saved data
 
 ## Uninstall
 
-In Desktop Mode, double-click **Uninstall MagicShelf** and choose **Uninstall**.
-Wait for the confirmation. MagicShelf and its creations stop, and their shortcuts
-are removed. Your creations and saved data are kept for a future reinstall.
+In Desktop Mode, double-click **Uninstall MagicShelf**, then choose:
+
+- **Keep my data** to keep your downloaded creations and saved progress for a future reinstall.
+- **Remove everything** to delete MagicShelf, its creations, settings and saved data. You will be asked to confirm this permanent deletion.
+- **Cancel** to leave everything as it is.
+
+Wait for the completion message before closing the uninstaller.
 
 Missing the shortcut? Download [Uninstall.MagicShelf.desktop](https://github.com/josethevrtech/magicshelf/releases/latest/download/Uninstall.MagicShelf.desktop)
 to your desktop and open it. This also repairs an incomplete uninstall.

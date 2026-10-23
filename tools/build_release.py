@@ -3,7 +3,7 @@
 import argparse, base64, gzip, hashlib, json, os, shutil, stat, tarfile, tempfile, zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent.parent
-VERSION='0.3.17'
+VERSION='0.3.18'
 REPO='josethevrtech/magicshelf'
 
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -78,12 +78,12 @@ except Exception as error:
     uninstaller=out/'uninstall-magicshelf.py'
     # The recovery download must also work when no framework is installed.
     uninstaller.write_text((ROOT/'uninstall.py').read_text().replace(
-        'from magicshelf.session import service_environment',
+        'from magicshelf.session import service_environment, user_runtime',
         (ROOT/'magicshelf/session.py').read_text()))
     uninstall_source=launcher_source.replace('/install-magicshelf.py', '/uninstall-magicshelf.py').replace(sha(bootstrap),sha(uninstaller)).replace("str(path)]", "str(path),'--gui']")
     code="import base64;exec(base64.b64decode('"+base64.b64encode(uninstall_source.encode()).decode()+"'))"
     escaped=code.replace('\\','\\\\').replace('"','\\"').replace('%','%%')
-    (out/'Uninstall.MagicShelf.desktop').write_text('[Desktop Entry]\nType=Application\nName=Uninstall MagicShelf\nComment=Remove MagicShelf and keep saved data\nExec=python3 -c "'+escaped+'" %k\nIcon=com.josethevrtech.magicshelf\nTerminal=false\nCategories=Game;\nX-MagicShelf-Launcher=true\n')
+    (out/'Uninstall.MagicShelf.desktop').write_text('[Desktop Entry]\nType=Application\nName=Uninstall MagicShelf\nComment=Remove MagicShelf and choose whether to keep your data\nExec=python3 -c "'+escaped+'" %k\nIcon=com.josethevrtech.magicshelf\nTerminal=false\nCategories=Game;\nX-MagicShelf-Launcher=true\n')
     (out/'Uninstall.MagicShelf.desktop').chmod(0o755)
     update={'schema_version':1,'version':VERSION,'artifacts':{arch:{'url':f'https://github.com/{REPO}/releases/download/v{VERSION}/{archive.name}','sha256':sha(archive),'size_bytes':archive.stat().st_size}}}
     (out/'framework.json').write_text(json.dumps(update,indent=2)+'\n')
