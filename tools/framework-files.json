@@ -13,6 +13,7 @@
   "magicshelf/packages.py",
   "magicshelf/preferences.py",
   "magicshelf/server.py",
+  "magicshelf/session.py",
   "magicshelf/setup.py",
   "magicshelf/storefront.py",
   "magicshelf/updates.py",

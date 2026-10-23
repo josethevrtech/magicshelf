@@ -47,6 +47,10 @@ class InstallerTests(unittest.TestCase):
         (self.source / "bin/magicshelf").write_text("tampered")
         with self.assertRaises(RuntimeError):installer.install(self.source)
         self.assertFalse((self.home / ".config/systemd/user/magicshelf.service").exists())
+    def test_missing_session_is_rejected_before_staging_or_changing_files(self):
+        with patch.object(installer, 'system', side_effect=RuntimeError('No user bus')):
+            with self.assertRaisesRegex(RuntimeError, 'No user bus'): installer.install(self.source)
+        self.assertFalse((self.home/'.local/share/magicshelf').exists())
     def test_first_install_failure_stops_new_services_and_removes_current(self):
         with patch.object(installer.subprocess,"run",side_effect=RuntimeError("bootstrap failed")), self.assertRaises(RuntimeError):
             installer.install(self.source)
@@ -97,3 +101,21 @@ class UninstalledUpdateTests(InstallerTests):
         self.assertIn('--gui',shortcut.read_text())
         self.assertIn('Terminal=false',shortcut.read_text())
         self.assertTrue(shortcut.stat().st_mode & 0o111)
+
+
+class ServiceErrorTests(unittest.TestCase):
+    def test_installer_log_keeps_service_failure_reason_and_uses_user_session(self):
+        result = types.SimpleNamespace(returncode=1, stdout='', stderr='Failed to connect to user scope bus')
+        with patch.object(installer, 'service_environment', return_value={'XDG_RUNTIME_DIR': '/main/session'}), \
+                patch.object(installer.subprocess, 'run', return_value=result) as run:
+            with self.assertRaisesRegex(RuntimeError, 'Failed to connect to user scope bus'):
+                installer.system('daemon-reload')
+            self.assertEqual(run.call_args.kwargs['env']['XDG_RUNTIME_DIR'], '/main/session')
+
+    def test_update_installer_loads_helper_without_old_package_import(self):
+        import sys
+        old_package = types.ModuleType('magicshelf'); old_package.__path__ = []
+        with patch.dict(sys.modules, {'magicshelf': old_package, 'magicshelf.session': None}):
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            self.assertTrue(callable(module.service_environment))

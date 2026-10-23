@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+from magicshelf.session import service_environment
 
 OWNED_UNIT = re.compile(r'magicshelf(?:-vr|-update|-module-[A-Za-z0-9_.-]+)?\.service')
 
@@ -26,7 +27,7 @@ def desktop_directory(home):
 
 
 def system(*args, check=True):
-    result = subprocess.run(['systemctl', '--user', *args], capture_output=True, text=True, timeout=90)
+    result = subprocess.run(['systemctl', '--user', *args], env=service_environment(), capture_output=True, text=True, timeout=90)
     if result.stdout: print(result.stdout.rstrip())
     if result.stderr: print(result.stderr.rstrip(), file=sys.stderr)
     if check and result.returncode:
@@ -83,7 +84,7 @@ def uninstall(progress=lambda label: None):
         progress('Removing shortcuts…')
         binary = root/'current/bin/magicshelf-vr'
         if binary.is_file() and properties('steamvr.service')['ActiveState'] == 'active':
-            result = subprocess.run([str(binary), '--unregister'], capture_output=True, text=True, timeout=20)
+            result = subprocess.run([str(binary), '--unregister'], env=service_environment(), capture_output=True, text=True, timeout=20)
             print(result.stdout + result.stderr)
             if result.returncode:
                 raise RuntimeError('MagicShelf stopped, but its SteamVR shortcut could not be removed. Please try again.')

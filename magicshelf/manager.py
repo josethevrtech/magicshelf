@@ -17,6 +17,7 @@ from .storefront import decorate
 from . import preferences, setup
 from .framework_updates import FrameworkUpdates
 from .updates import Updates
+from .session import service_environment, user_runtime
 
 from .collections import OFFICIAL
 ADAPTERS = {
@@ -44,7 +45,7 @@ def quote(value):
 
 class System:
     def call(self, *args, check=True):
-        return subprocess.run(["systemctl", "--user", *args], check=check, text=True, capture_output=True, timeout=70)
+        return subprocess.run(["systemctl", "--user", *args], env=service_environment(), check=check, text=True, capture_output=True, timeout=70)
 
     def active(self, unit):
         return self.call("is-active", "--quiet", unit, check=False).returncode == 0
@@ -69,7 +70,7 @@ class Manager(Updates):
         self.root = self.home / ".local/share/magicshelf"
         self.config = self.home / ".config/magicshelf"
         self.units = self.home / ".config/systemd/user"
-        self.runtime = Path(runtime or Path(os.environ.get("XDG_RUNTIME_DIR", "/run/user/" + str(os.getuid()))) / "magicshelf")
+        self.runtime = Path(runtime or user_runtime() / "magicshelf")
         for p in (self.root, self.config, self.units, self.runtime):
             p.mkdir(parents=True, exist_ok=True)
         self.runtime.chmod(0o700)
