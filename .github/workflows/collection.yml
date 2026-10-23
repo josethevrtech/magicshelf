@@ -1,0 +1,32 @@
+name: Refresh creation collection
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+  push:
+    branches: [main]
+    paths: ['collections.json', 'tools/sync_catalog.py', '.github/workflows/collection.yml']
+permissions:
+  contents: write
+concurrency:
+  group: creation-collection
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 tools/sync_catalog.py
+      - name: Publish catalog changes
+        run: |
+          if git diff --quiet -- catalog.json; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add catalog.json
+          git commit -m 'Refresh published creation metadata'
+          git push origin HEAD:main

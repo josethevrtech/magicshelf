@@ -86,7 +86,7 @@ license independently of the framework code.
 `module.subscribe` takes `id`, boolean `subscribed`, and, when subscribing, the
 reviewed `permissions` array. It installs an absent package Off and persists the
 original catalog and approved permissions. The manager refreshes catalogs ten
-seconds after startup and every five minutes. `subscriptions.sync` and
+seconds after startup and every minute. `subscriptions.sync` and
 `catalog.refresh` request the same check in the background and return immediately.
 `checking_updates` reports catalog activity; navigation remains available.
 Catalogs are fetched independently, and unavailable sources retain their cached

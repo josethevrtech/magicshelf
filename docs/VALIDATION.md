@@ -566,3 +566,35 @@ logo geometry and palette.
   this visual update and were left in that state.
 
 This change does not modify creation setup, downloads or runtime behavior.
+
+## 0.3.13 live creation discovery
+
+Pocket Pikachu had only been registered by its local development installer. It
+had no published repository or followed download catalog, so uninstalling removed
+its only listing. Pocket Pikachu now has an independent 0.3.2 release, verified
+package, public preview and catalog, registered in `collections.json`.
+
+The manager fetches the live official collection directory during refresh and
+merges new catalogs into existing installations. Discover and dashboard opening
+request a nonblocking check, reusing checks less than 30 seconds old. Background
+checks run every minute. Independent creation catalogs take priority over the
+compatibility mirror; existing subscription sources remain pinned. Offline or
+invalid directory responses retain known catalogs and cached listings.
+
+The root catalog mirrors registered creation metadata for older clients. Its
+GitHub workflow runs on registration, manually, and on a five-minute schedule.
+Scheduling and CDN propagation are not instantaneous.
+
+- All 119 Python tests pass locally and on Frame, including directory discovery,
+  offline retention, malformed directory rejection, catalog preference, uninstall
+  persistence, refresh throttling and compatibility-mirror outage handling.
+- Native navigation and GPU texture checks pass locally and on Frame. The ARM64
+  framework builds and the verified 0.3.13 archive installs successfully.
+- Pocket Pikachu's emulator, alarm, navigation, progression, controller and
+  movement suites pass on Frame and in its independent GitHub CI workflow.
+- On the real Frame, the published Pocket Pikachu package downloaded and installed
+  twice. On reported ready; Off stopped its process. Removing it retained the
+  Discover listing, including after a manager restart. Saved data remained,
+  other creations were unchanged and SteamVR kept PID 2552.
+- The final test state leaves Pocket Pikachu uninstalled and unsubscribed, with
+  its public preview and download available in Discover.

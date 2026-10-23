@@ -146,7 +146,7 @@ struct StoreUI{
    ShelfTheme::rect(c,278,y+78,970,1,ShelfTheme::border);
   }
   if(settingsTab=="app"){
-   text(c,278,518,"Updates",24);wrap(c,278,553,650,"Updates download automatically and install while a creation is Off. Checks run every five minutes. Use Check updates any time.",18,3);
+   text(c,278,518,"Updates",24);wrap(c,278,553,650,"Updates download automatically and install while a creation is Off. Checks run every minute. Use Check updates any time.",18,3);
    button(c,1010,522,238,"Check updates","subscriptions.sync");
    auto*app=field(state,"framework_update");auto stage=textfield(app,"stage");
    text(c,278,661,"MagicShelf "+textfield(state,"version"),24);

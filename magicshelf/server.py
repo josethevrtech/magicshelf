@@ -44,6 +44,7 @@ def dispatch(manager, packet):
         "module.rollback": lambda: manager.rollback(p["id"]),
         "catalog.add": lambda: manager.add_catalog(p["url"]),
         "catalog.refresh": check_updates,
+        "catalog.discover": manager.discover,
         "subscriptions.sync": check_updates,
         "home": lambda: manager.home_all(),
         "settings.update": lambda: manager.update_settings(p.get("changes")),
@@ -165,7 +166,7 @@ def serve():
             except Exception as error:
                 manager.update_message = "Automatic updates will retry: " + str(error)[:180]
             # Check promptly after a failed download or a temporary offline period.
-            time.sleep(60 if manager.catalog_errors or manager.state['update_errors'] else 5 * 60)
+            time.sleep(60)
     threading.Thread(target=subscriptions, daemon=True).start()
     try:
         server.serve_forever()

@@ -70,6 +70,7 @@ void dashboard(){
   vr::VREvent_t event;
   while(vr::VRSystem()->PollNextEvent(&event,sizeof(event)))if(event.eventType==vr::VREvent_Quit){vr::VRSystem()->AcknowledgeQuit_Exiting();running=false;}
   while(o->PollNextOverlayEvent(panel,&event,sizeof(event))){
+   if(event.eventType==vr::VREvent_OverlayShown){action("catalog.discover","{}");continue;}
    if(event.eventType==vr::VREvent_Quit){running=false;continue;}
    if(event.eventType==vr::VREvent_FocusLeave||event.eventType==vr::VREvent_OverlayHidden){input.cancel();continue;}
    if(event.eventType==vr::VREvent_MouseMove){input.move(ui,event.data.mouse.x,StoreUI::H-event.data.mouse.y,working);continue;}
@@ -79,6 +80,7 @@ void dashboard(){
    if(event.eventType==vr::VREvent_MouseButtonDown)input.down(ui,x,y,working);
    else if(auto hit=input.up(ui,x,y,working)){
     std::string method,params;auto before=ui.key();if(ui.local(*hit,j,method,params))action(method,params);
+    else if(hit->method=="ui.discover")action("catalog.discover","{}");
     if(ui.key()!=before)input.cancel();
     o->TriggerLaserMouseHapticVibration(panel,.012f,90.f,.16f);
     working=busy||boolfield(j,"busy")||textfield(field(j,"framework_update"),"stage")=="installing";
