@@ -10,9 +10,84 @@ import re
 import shutil
 import subprocess
 import sys
-from magicshelf.session import service_environment
+from magicshelf.session import service_environment, user_runtime
 
 OWNED_UNIT = re.compile(r'magicshelf(?:-vr|-update|-module-[A-Za-z0-9_.-]+)?\.service')
+
+
+def remove_path(path):
+    """Remove an app-owned path without following a saved-data symlink."""
+    if path.is_symlink() or not path.is_dir():
+        path.unlink(missing_ok=True)
+    else:
+        try:
+            shutil.rmtree(path)
+        except PermissionError:
+            # Android creates files owned by IDs in the user's Podman namespace.
+            # Only callers' fixed MagicShelf paths are passed to this helper.
+            if not shutil.which('podman'):
+                raise
+            subprocess.run(['podman', 'unshare', 'rm', '-rf', '--', str(path)],
+                           env=service_environment(), check=True, timeout=180,
+                           capture_output=True, text=True)
+            if path.exists():
+                raise RuntimeError('Some MagicShelf files could not be removed. Please try again.')
+
+
+def stop_phone_container(purge):
+    if not shutil.which('podman'):
+        return
+    def podman(*args):
+        return subprocess.run(['podman', '--events-backend', 'none', *args],
+                              env=service_environment(), check=True,
+                              capture_output=True, text=True, timeout=30)
+    name = 'lepton-magicshelf-phone'
+    items = json.loads(podman('ps', '--all', '--filter', 'name=^'+name+'$', '--format', 'json').stdout)
+    for item in items:
+        if name not in item.get('Names', []):
+            continue
+        if item.get('Labels', {}).get('lepton') != 'true':
+            raise RuntimeError('The Android Phone container could not be verified. Nothing in its storage was removed.')
+        identity = item['Id']
+        if item.get('State') == 'paused':
+            podman('unpause', identity)
+        if item.get('State') in ('running', 'paused'):
+            podman('stop', '--time', '5', identity)
+        if purge:
+            podman('rm', identity)
+
+
+def success_message(purge):
+    if purge:
+        return 'MagicShelf, your creations and saved data have been removed.'
+    return 'MagicShelf is uninstalled. Your creations and saved data are kept.'
+
+
+def choose_removal(gui):
+    if gui:
+        choice = subprocess.run(['kdialog', '--title', 'Uninstall MagicShelf',
+            '--yes-label', 'Keep my data', '--no-label', 'Remove everything',
+            '--cancel-label', 'Cancel', '--warningyesnocancel',
+            'Uninstall MagicShelf?\nChoose what happens to your creations and saved data.'])
+        if choice.returncode == 0:
+            return False
+        if choice.returncode != 1:
+            return None
+        confirm = subprocess.run(['kdialog', '--title', 'Remove everything?',
+            '--continue-label', 'Remove everything', '--cancel-label', 'Cancel',
+            '--warningcontinuecancel',
+            'Permanently delete MagicShelf, all downloaded creations, settings and saved data?\nThis cannot be undone.'])
+        return True if confirm.returncode == 0 else None
+    print('Uninstall MagicShelf?\n1. Keep creations and saved data\n2. Remove everything\nEnter to cancel')
+    try:
+        choice = input('Choose 1 or 2: ').strip()
+        if choice == '1':
+            return False
+        if choice == '2' and input('Permanently delete all MagicShelf data? Type DELETE to confirm: ').strip() == 'DELETE':
+            return True
+    except (EOFError, KeyboardInterrupt):
+        pass
+    return None
 
 
 def desktop_directory(home):
@@ -52,13 +127,15 @@ def stop(unit):
         raise RuntimeError('MagicShelf is still running. Nothing has been removed. Please try again.')
 
 
-def uninstall(progress=lambda label: None):
+def uninstall(progress=lambda label: None, *, purge=False):
     if os.geteuid() == 0:
         raise RuntimeError('Open Uninstall MagicShelf from your own desktop. No administrator password is needed.')
     home = Path.home()
     root = home/'.local/share/magicshelf'
     config = home/'.config/magicshelf'
     units = home/'.config/systemd/user'
+    if root.is_symlink():
+        raise RuntimeError('MagicShelf storage points outside its folder. Nothing was removed.')
     root.mkdir(parents=True, exist_ok=True)
     with (root/'install.lock').open('a') as lock:
         try:
@@ -81,6 +158,7 @@ def uninstall(progress=lambda label: None):
         for path in units.glob('*.wants/magicshelf*.service'):
             if OWNED_UNIT.fullmatch(path.name): names.add(path.name)
         for name in sorted(names): stop(name)
+        stop_phone_container(purge)
         progress('Removing shortcuts…')
         binary = root/'current/bin/magicshelf-vr'
         if binary.is_file() and properties('steamvr.service')['ActiveState'] == 'active':
@@ -92,6 +170,7 @@ def uninstall(progress=lambda label: None):
         # links instead of asking disable --now to operate on missing units.
         for name in sorted(names):
             (units/name).unlink(missing_ok=True)
+            remove_path(units/(name+'.d'))
             for link in units.glob('*.wants/'+name): link.unlink(missing_ok=True)
             for link in units.glob('*.requires/'+name): link.unlink(missing_ok=True)
         for name in ('android-phone-vr.service', 'digitalpartner-vr.service'):
@@ -102,12 +181,13 @@ def uninstall(progress=lambda label: None):
             if values['ActiveState'] == 'failed': system('reset-failed', name)
             if values['ActiveState'] not in ('inactive', 'failed') or values['MainPID'] != '0':
                 raise RuntimeError('MagicShelf is still running. Please try uninstalling again.')
-        (config/'magicshelf.vrmanifest').unlink(missing_ok=True)
+        if not config.is_symlink():
+            (config/'magicshelf.vrmanifest').unlink(missing_ok=True)
+            (config/'framework-update.json').unlink(missing_ok=True)
         (root/'framework-install.json').unlink(missing_ok=True)
-        (config/'framework-update.json').unlink(missing_ok=True)
         # Saved creations remain available, but stay Off after a reinstall.
         statepath = config/'state.json'
-        if statepath.exists():
+        if not purge and not config.is_symlink() and statepath.exists():
             try:
                 state = json.loads(statepath.read_text())
                 for item in state['modules'].values(): item['enabled'] = False
@@ -121,20 +201,46 @@ def uninstall(progress=lambda label: None):
         desktop = desktop_directory(home)
         for name in ('MagicShelf.desktop', 'Uninstall MagicShelf.desktop'):
             (desktop/name).unlink(missing_ok=True)
-        print('MagicShelf is uninstalled. Your creations and saved data are kept. Use Install MagicShelf to install again.')
+        progress('Removing saved data…' if purge else 'Removing MagicShelf…')
+        # Keep the lock and the empty removal marker, so an already queued update
+        # cannot reinstall the app or acquire a second lock during deletion.
+        if purge:
+            for path in root.iterdir():
+                if path.name not in ('install.lock', 'uninstalled'):
+                    remove_path(path)
+            remove_path(config)
+        else:
+            for name in ('current', 'current.next', 'current.recovery', 'releases',
+                         'install-backups', 'framework-downloads', 'previews'):
+                remove_path(root/name)
+        remove_path(home/'.cache/magicshelf')
+        remove_path(user_runtime()/'magicshelf')
+        if purge:
+            # Includes any previous troubleshooting backups, not just live saves.
+            remove_path(home/'.local/state/magicshelf')
+        print(success_message(purge))
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--gui', action='store_true')
+    choice_group = parser.add_mutually_exclusive_group()
+    choice_group.add_argument('--keep-data', dest='purge', action='store_false', default=None,
+                              help='uninstall and keep creations and saved data')
+    choice_group.add_argument('--purge', action='store_true', default=None,
+                              help='uninstall and permanently delete all MagicShelf data')
     args = parser.parse_args(argv)
     gui = args.gui and shutil.which('kdialog')
     if args.gui and not gui:
         print('Could not open the uninstall dialog. Run this from Desktop Mode.', file=sys.stderr)
         return 1
-    if gui:
-        choice = subprocess.run(['kdialog', '--title', 'Uninstall MagicShelf', '--yes-label', 'Uninstall', '--no-label', 'Cancel', '--warningyesno', 'Uninstall MagicShelf? Your creations and saved data will be kept.'])
-        if choice.returncode: return 0
+    if gui and args.purge is not None:
+        parser.error('Use --gui to choose in the dialog, or --keep-data / --purge without --gui.')
+    if not gui and args.purge is None and not sys.stdin.isatty():
+        parser.error('Choose --keep-data or --purge, or open the desktop uninstaller.')
+    purge = choose_removal(bool(gui)) if args.purge is None else args.purge
+    if purge is None:
+        return 0
     log = Path.home()/'.local/state/magicshelf/uninstall.log'
     log.parent.mkdir(parents=True, exist_ok=True)
     ref = []; dbus = shutil.which('qdbus6') or shutil.which('qdbus')
@@ -149,15 +255,16 @@ def main(argv=None):
             if result.returncode == 0: ref = result.stdout.split()
         with log.open('w') as stream, contextlib.redirect_stdout(stream), contextlib.redirect_stderr(stream):
             log.chmod(0o600)
-            uninstall(progress)
+            uninstall(progress, purge=purge)
     except Exception as exception:
         error = str(exception)
+        log.parent.mkdir(parents=True, exist_ok=True)
         with log.open('a') as stream: stream.write('\n'+error+'\n')
     finally:
         if ref:
             with contextlib.suppress(OSError, subprocess.SubprocessError):
                 subprocess.run([dbus, *ref, 'close'], capture_output=True, timeout=3)
-    message = error or 'MagicShelf is uninstalled. Your creations and saved data are kept. You can use Install MagicShelf again anytime.'
+    message = error or success_message(purge)
     if gui:
         subprocess.run(['kdialog', '--title', 'MagicShelf', '--error' if error else '--msgbox', message])
     else: print(message, file=sys.stderr if error else sys.stdout)
