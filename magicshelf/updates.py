@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from .contracts import catalog, load, machine, require, version
+from .collections import OFFICIAL, DIRECTORY, catalogs
 
 
 def update_error(error):
@@ -25,6 +26,12 @@ def update_error(error):
 
 
 class Updates:
+    def discover(self):
+        # Opening Discover stays instant; a recent/in-flight check is reused.
+        if time.time() - self.state.get('last_update_check', 0) < 30:
+            return self.snapshot()
+        return self.request_update_check()
+
     def request_update_check(self):
         """Return immediately so a manual check does not lock the native controls."""
         import threading
@@ -51,7 +58,6 @@ class Updates:
         # Network work does not hold the action lock or disable collection controls.
         from .manager import download
         with self._refresh_lock:
-            urls = list(self.state["catalogs"])
             self.checking = True
             self.publish()
             def fetch(url):
@@ -63,12 +69,28 @@ class Updates:
                 except Exception as error:
                     return None, update_error(error)
             try:
+                directory_errors = {}
+                if OFFICIAL in self.state['catalogs']:
+                    try:
+                        with tempfile.TemporaryDirectory(dir=self.root) as temp:
+                            path = Path(temp) / 'collections.json'
+                            download(DIRECTORY, path, 64 * 1024)
+                            discovered = catalogs(load(path))
+                        with self.transaction():
+                            self.state['catalogs'] = list(dict.fromkeys(self.state['catalogs'] + discovered))
+                            self.save()
+                    except Exception as error:
+                        # Keep known collections and their cached listings offline.
+                        directory_errors[DIRECTORY] = update_error(error)
+                urls = list(self.state['catalogs'])
                 with ThreadPoolExecutor(max_workers=4) as pool:
                     results = dict(zip(urls, pool.map(fetch, urls)))
                 with self.transaction():
                     cached = list(self.state["catalog"])
-                    items, seen, failures = [], set(), {}
-                    for url in self.state["catalogs"]:
+                    items, seen, failures = [], set(), dict(directory_errors)
+                    # Prefer a creation's own latest catalog over the compatibility
+                    # mirror, while retaining the source of existing subscriptions.
+                    for url in sorted(self.state["catalogs"], key=lambda url: url == OFFICIAL):
                         entries, error = results.get(url, (None, "Waiting for the next check."))
                         if error:
                             failures[url] = error

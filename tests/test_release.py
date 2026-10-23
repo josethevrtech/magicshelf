@@ -55,7 +55,7 @@ class ReleaseTests(unittest.TestCase):
         ast.parse((self.root/'dist/install-magicshelf.py').read_text())
 
     def test_framework_release_does_not_build_or_bundle_creations(self):
-        self.assertEqual(json.loads((self.root/'dist/catalog.json').read_text())['modules'], [])
+        self.assertEqual((self.root/'dist/catalog.json').read_bytes(), (PROJECT/'catalog.json').read_bytes())
         self.assertEqual(list((self.root/'dist').glob('*.magicshelf')), [])
         self.assertFalse((self.root/'dist/example-catalog.json').exists())
 

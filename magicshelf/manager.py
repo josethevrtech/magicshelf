@@ -18,7 +18,7 @@ from . import preferences, setup
 from .framework_updates import FrameworkUpdates
 from .updates import Updates
 
-OFFICIAL = "https://raw.githubusercontent.com/josethevrtech/magicshelf/main/catalog.json"
+from .collections import OFFICIAL
 ADAPTERS = {
     "org.magicshelf.android-phone": {"name": "Android Phone", "description": "Your Android phone. Off pauses Android and its audio; On resumes your apps.", "overlay": "local.androidphone.device", "shell": "android-phone-vr.service", "backends": ["digitalpartner-android.service", "android-phone-bridge.service"], "binary": "android-phone-vr", "container": "lepton-courage-tablet"},
     "org.magicshelf.digital-partner": {"name": "Digivice", "description": "Your Digital Partner. Off pauses the game and its audio; On resumes your pet.", "overlay": "local.digitalpartner.device", "shell": "digitalpartner-vr.service", "backends": ["digitalpartner.service"], "binary": "digitalpartner-vr"},
@@ -80,13 +80,13 @@ class Manager(Updates):
         collections = seed.with_name('collections.json')
         default_catalogs = [OFFICIAL]
         if collections.exists():
-            from .packages import check_url
-            defaults = load(collections)
-            require(defaults.get('schema_version') == 1, 'Unsupported collections schema')
-            default_catalogs += [check_url(url) for url in defaults['catalogs']]
+            from .collections import catalogs
+            default_catalogs += catalogs(load(collections))
         initial = [{**i, "catalog_url": OFFICIAL} for i in catalog(load(seed))["modules"] if i["architecture"] == machine()] if seed.exists() else []
         self.state = load(self.statepath) if self.statepath.exists() else {"schema_version": 1, "modules": {}, "catalogs": default_catalogs, "catalog": initial}
         require(self.state.get("schema_version") == 1 and isinstance(self.state.get("modules"), dict), "Unsupported MagicShelf state; restore the backup before continuing")
+        if OFFICIAL in self.state['catalogs']:
+            self.state['catalogs'] = list(dict.fromkeys(self.state['catalogs'] + default_catalogs))
         self.layoutpath = self.config / "object-dock.json"
         if not self.layoutpath.exists():
             source = self.legacy / "object-dock.json"

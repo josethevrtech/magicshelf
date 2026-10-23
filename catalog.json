@@ -1,1 +1,224 @@
-{"schema_version":1,"name":"MagicShelf by josethevrtech","modules":[]}
+{
+  "schema_version": 1,
+  "name": "MagicShelf",
+  "modules": [
+    {
+      "schema_version": 1,
+      "api_version": 2,
+      "id": "org.magicshelf.android-phone",
+      "version": "0.2.6",
+      "name": "Android Phone (Virtual)",
+      "description": "A virtual Android phone, right beside you in VR.",
+      "author": "josethevrtech",
+      "license": "MIT (source); external assets retain their licenses",
+      "platform": "linux",
+      "architecture": "aarch64",
+      "entrypoint": "bin/start",
+      "control_entrypoint": "bin/control",
+      "cleanup_entrypoint": "bin/cleanup",
+      "startup_timeout_sec": 180,
+      "permissions": [
+        "vr-overlay",
+        "external-runtime",
+        "user-files",
+        "network"
+      ],
+      "memory_mb": 1024,
+      "price": 0,
+      "links": [
+        {
+          "label": "Android Phone (Virtual) on GitHub",
+          "url": "https://github.com/josethevrtech/magicshelf-android-phone"
+        },
+        {
+          "label": "MagicShelf framework",
+          "url": "https://github.com/josethevrtech/magicshelf"
+        }
+      ],
+      "category": "Utilities",
+      "tagline": "A little Android. A lot of possibility.",
+      "about": "Android Phone (Virtual) keeps your Android apps within reach. Pick up the phone, move it around your space, or return it to the shelf. Its screen supports controller taps, swipes, typing and brightness controls. Turn it off to stop Android and its audio; installed apps and data remain for next time.",
+      "screenshots": [
+        {
+          "url": "https://raw.githubusercontent.com/josethevrtech/magicshelf-android-phone/main/media/phone-home.png",
+          "caption": "The Android home screen on the original MagicShelf phone."
+        },
+        {
+          "url": "https://raw.githubusercontent.com/josethevrtech/magicshelf-android-phone/main/media/phone-settings-virtual.png",
+          "caption": "On-device controls for brightness, size and placement."
+        }
+      ],
+      "credits": [
+        {
+          "name": "josethevrtech",
+          "role": "Creation, original phone model and integration",
+          "url": "https://github.com/josethevrtech",
+          "license": "Original procedural phone geometry."
+        }
+      ],
+      "minimum_framework_version": "0.3.8",
+      "steam_requirements": [
+        {
+          "appid": 3029110,
+          "title": "Android support",
+          "files": [
+            "Lepton/lepton",
+            "Lepton/version.txt"
+          ]
+        }
+      ],
+      "url": "https://github.com/josethevrtech/magicshelf-android-phone/releases/download/v0.2.6/org.magicshelf.android-phone-0.2.6-linux-aarch64.magicshelf",
+      "sha256": "ab8d317aabeb13795d2a73a43a0b11e8469e5f09ac2f405871e40ab721ec5d07",
+      "size_bytes": 117732,
+      "collection_url": "https://github.com/josethevrtech/magicshelf-android-phone/releases/latest/download/catalog.json"
+    },
+    {
+      "schema_version": 1,
+      "api_version": 2,
+      "id": "org.magicshelf.digital-partner",
+      "version": "0.2.5",
+      "name": "Smartphone Digivice",
+      "description": "Raise your Digital Partner inside the Courage Smartphone Digivice on Steam Frame.",
+      "author": "josethevrtech",
+      "license": "MIT (source); external assets retain their licenses",
+      "platform": "linux",
+      "architecture": "aarch64",
+      "entrypoint": "bin/start",
+      "control_entrypoint": "bin/control",
+      "cleanup_entrypoint": "bin/cleanup",
+      "startup_timeout_sec": 180,
+      "permissions": [
+        "vr-overlay",
+        "external-runtime",
+        "user-files"
+      ],
+      "memory_mb": 2048,
+      "price": 0,
+      "links": [
+        {
+          "label": "Smartphone Digivice on GitHub",
+          "url": "https://github.com/josethevrtech/magicshelf-smartphone-digivice"
+        },
+        {
+          "label": "MagicShelf framework",
+          "url": "https://github.com/josethevrtech/magicshelf"
+        },
+        {
+          "label": "Digital Partner game",
+          "url": "https://aludeku.itch.io/digital-partner-digimon"
+        }
+      ],
+      "category": "Companions",
+      "tagline": "A digital companion, now in your world.",
+      "about": "Smartphone Digivice brings Digital Partner into VR inside Jojogape\u2019s Courage smartphone model. Pick it up, care for your pet, and place it anywhere in your space. The on-device settings control size, brightness and placement; name fields open the headset keyboard. Off stops the game and its audio. Saved pets and settings stay in the same private data directory across updates.",
+      "screenshots": [
+        {
+          "url": "https://raw.githubusercontent.com/josethevrtech/magicshelf-smartphone-digivice/v0.2.5/media/smartphone-digivice.png",
+          "caption": "Digital Partner running inside Smartphone Digivice, using Jojogape\u2019s Courage model."
+        },
+        {
+          "url": "https://raw.githubusercontent.com/josethevrtech/magicshelf-smartphone-digivice/v0.2.5/media/smartphone-digivice-back.png",
+          "caption": "Smartphone Digivice\u2019s Courage case and crest, viewed from the back."
+        }
+      ],
+      "credits": [
+        {
+          "name": "Jojogape",
+          "role": "Smartphone Digivice 3D model",
+          "url": "https://x.com/jojogape",
+          "license": "Artist-provided personal-use model; no use for profit."
+        },
+        {
+          "name": "Aludeku",
+          "role": "Digital Partner game",
+          "url": "https://aludeku.itch.io/digital-partner-digimon",
+          "support_url": "https://aludeku.itch.io/digital-partner-digimon",
+          "license": "Game, characters and artwork retain their original rights."
+        },
+        {
+          "name": "boardernerd",
+          "role": "Original Season 1 Digivice used for the legacy icon",
+          "url": "https://www.thingiverse.com/thing:2695824",
+          "license": "Creative Commons Attribution."
+        }
+      ],
+      "minimum_framework_version": "0.3.8",
+      "steam_requirements": [
+        {
+          "appid": 4628740,
+          "title": "Game support",
+          "files": [
+            "Proton 11.0 (ARM64)/proton"
+          ]
+        },
+        {
+          "appid": 4185400,
+          "title": "Steam support",
+          "files": [
+            "SteamLinuxRuntime_4-arm64/_v2-entry-point"
+          ]
+        }
+      ],
+      "url": "https://github.com/josethevrtech/magicshelf-smartphone-digivice/releases/download/v0.2.5/org.magicshelf.digital-partner-0.2.5-linux-aarch64.magicshelf",
+      "sha256": "f27549aceb6abe1394f87eb3226b7d6dc38310dc5e635fca0e610d92c59fc9b2",
+      "size_bytes": 546127390,
+      "collection_url": "https://github.com/josethevrtech/magicshelf-digivice/releases/latest/download/catalog.json"
+    },
+    {
+      "schema_version": 1,
+      "api_version": 2,
+      "id": "org.magicshelf.pocket-pikachu",
+      "version": "0.3.2",
+      "name": "Pocket Pikachu",
+      "description": "A nostalgic Pocket Pikachu with headset steps, original-style settings, a daily alarm and native controller play.",
+      "author": "josethevrtech",
+      "license": "MIT (integration); third-party assets retain their rights",
+      "platform": "linux",
+      "architecture": "aarch64",
+      "entrypoint": "bin/pocket-pikachu",
+      "permissions": [
+        "vr-overlay"
+      ],
+      "memory_mb": 768,
+      "control_entrypoint": "bin/control",
+      "startup_timeout_sec": 30,
+      "category": "Companions",
+      "tagline": "Every step brings you closer.",
+      "about": "Walk, work out, and grow your friendship with Pikachu. Earn watts for gifts and slots. Pick up the handheld and push or pull it with your stick. Play with its buttons or controllers, set its clock and alarm, and switch its beeps on or off.",
+      "credits": [
+        {
+          "name": "Alberto-rp",
+          "role": "Pocket Pikachu emulator",
+          "url": "https://github.com/Alberto-rp/Pocket-pikachu-emulator",
+          "license": "Fan project; original rights retained."
+        },
+        {
+          "name": "Wikiti",
+          "role": "Pocket Pikachu handheld model",
+          "url": "https://sketchfab.com/3d-models/pocket-pikachu-f9ea485010804602b96e1ee3f0c5d241",
+          "license": "Sketchfab Standard; user-provided asset."
+        }
+      ],
+      "links": [
+        {
+          "label": "Pocket Pikachu on GitHub",
+          "url": "https://github.com/josethevrtech/magicshelf-pocket-pikachu"
+        },
+        {
+          "label": "Emulator source",
+          "url": "https://github.com/Alberto-rp/Pocket-pikachu-emulator"
+        }
+      ],
+      "screenshots": [
+        {
+          "url": "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/download/v0.3.2/pocket-pikachu.png",
+          "caption": "Pocket Pikachu\u2019s live pixel display inside Wikiti\u2019s yellow handheld model."
+        }
+      ],
+      "url": "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/download/v0.3.2/org.magicshelf.pocket-pikachu-0.3.2-linux-aarch64.magicshelf",
+      "sha256": "a5fc15cb5bfbf5b88ab9aab8294a530fe564f4f4735bbc17833fb99f365095b9",
+      "size_bytes": 2620420,
+      "collection_url": "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/latest/download/catalog.json"
+    }
+  ]
+}

@@ -20,6 +20,22 @@
    signing keys, or developer settings entered the release.
 
 Creations have independent repositories, versions, release tags and catalogs.
+After the first complete public release, add the creation's stable latest
+`catalog.json` URL to the framework's `collections.json` and run
+`python3 tools/sync_catalog.py`. Commit both files. This is the one-time publisher
+registration that makes a new creation appear in Discover for everyone;
+installing an unpublished development package does not publish or register it.
+The app fetches this live directory on collection checks, including when Discover
+opens, and checks in the background every minute. Later releases stay in the
+creation's own repository and need no framework release or registry edit.
+
+The `Refresh creation collection` workflow mirrors published metadata into the
+root catalog on registration and on a five-minute schedule for older app versions.
+GitHub scheduling and CDN propagation can delay that compatibility mirror.
+Current clients read each creation's own catalog directly. Uninstalling removes
+the download and subscription, but leaves the collection followed and its listing
+available to reinstall. Offline checks retain the last valid listings.
+
 Start with `tools/new_creation.py` and follow [CREATING.md](CREATING.md). Pin an
 exact SDK commit; SDK upgrades are explicit source changes. The Phone and Digivice
 are working API 2 examples with their own backend lifecycle and configuration
