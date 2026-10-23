@@ -3,6 +3,7 @@
 #include "dashboard_texture.h"
 #include <atomic>
 #include <csignal>
+#include <ctime>
 #include <thread>
 #include <mutex>
 #include <memory>
@@ -54,7 +55,7 @@ void dashboard(){
  };
  using State=std::unique_ptr<json_object,decltype(&json_object_put)>;
  State state(json_tokener_parse("{\"modules\":[],\"message\":\"Connecting to MagicShelf...\"}"),json_object_put);
- using Clock=std::chrono::steady_clock;auto poll=Clock::now(),dockTick=poll;
+ using Clock=std::chrono::steady_clock;auto poll=Clock::now(),dockTick=poll,activityTick=poll;
  uint64_t frames=0,fullFrames=0,partialFrames=0;double peakMs=0;
  while(running){
   auto now=Clock::now();
@@ -67,6 +68,13 @@ void dashboard(){
    if(std::isfinite(width)&&width>=1.2f&&width<=2.4f&&fabsf(width-appliedWidth)>.001f){o->SetOverlayWidthInMeters(panel,width);appliedWidth=width;}
   }
   bool working=busy||boolfield(j,"busy")||textfield(field(j,"framework_update"),"stage")=="installing";
+  if(now>=activityTick){
+   // Publish even while hidden. Atomic replacement prevents partial heartbeats.
+   auto path=dir+"/dashboard-activity.json";
+   std::ofstream activity(path+".next");
+   activity<<"{\"pid\":"<<getpid()<<",\"time\":"<<std::time(nullptr)<<",\"visible\":"<<(o->IsOverlayVisible(panel)?"true":"false")<<",\"busy\":"<<(working?"true":"false")<<"}\n";
+   activity.close();std::filesystem::rename(path+".next",path);activityTick=now+std::chrono::seconds(1);
+  }
   vr::VREvent_t event;
   while(vr::VRSystem()->PollNextEvent(&event,sizeof(event)))if(event.eventType==vr::VREvent_Quit){vr::VRSystem()->AcknowledgeQuit_Exiting();running=false;}
   while(o->PollNextOverlayEvent(panel,&event,sizeof(event))){

@@ -66,6 +66,39 @@ class FrameworkUpdates:
         self.path = manager.config/'framework-update.json'
         self.root = manager.root/'framework-downloads'
         self.lock = threading.Lock()
+        self.quiet_since = None
+
+    def automatic_install(self):
+        """Apply a verified update only after the native app has been idle/hidden.
+
+        Running creations are independent services. A stale or missing heartbeat
+        from an active dashboard never counts as permission to interrupt it.
+        """
+        state = self.snapshot()
+        manager = self.manager
+        if state.get('stage') != 'ready' or state.get('automatic_attempted'):
+            self.quiet_since = None
+            return
+        blocked = (manager.busy or manager._sync_lock.locked() or manager._refresh_lock.locked()
+                   or (manager._install_thread and manager._install_thread.is_alive())
+                   or (manager.setup.thread and manager.setup.thread.is_alive()))
+        if not blocked and manager.system.active('magicshelf-vr.service'):
+            try:
+                activity = load(manager.runtime/'dashboard-activity.json')
+                pid = int(manager.system.call('show', 'magicshelf-vr.service', '-p', 'MainPID', '--value').stdout.strip())
+                blocked = (activity.get('pid') != pid or not 0 <= time.time() - activity['time'] <= 4
+                           or activity.get('visible') is not False or activity.get('busy') is not False)
+            except (OSError, ValueError, KeyError, TypeError, AttributeError):
+                blocked = True
+        if blocked:
+            self.quiet_since = None
+            return
+        now = time.monotonic()
+        if self.quiet_since is None:
+            self.quiet_since = now
+        elif now - self.quiet_since >= 30:
+            self.quiet_since = None
+            self.install(automatic=True)
 
     def snapshot(self):
         try:
@@ -114,7 +147,7 @@ class FrameworkUpdates:
                     shutil.rmtree(target)
                 (tmp/'unpacked').rename(target)
                 shutil.move(tmp/'update.tar.gz', target/'update.tar.gz')
-                self.set(stage='ready', message='A MagicShelf update is ready. Your creations will keep running.', **item)
+                self.set(stage='ready', message='MagicShelf will update when this panel is closed. Your creations keep running.', **item)
         except Exception as error:
             # Keep a verified ready download usable during a temporary outage.
             if self.snapshot().get('stage') != 'ready':
@@ -142,18 +175,27 @@ class FrameworkUpdates:
         except Exception:
             self.set(**{**state, 'stage': 'failed', 'message': 'The update was interrupted. Choose Check updates to try again.'})
 
-    def install(self):
+    def install(self, automatic=False):
         manager = self.manager
-        require(not manager.busy and not manager._sync_lock.locked(), 'Please let the current download finish, then try again.')
-        with self.lock:
-            state = self.snapshot()
-            require(state.get('stage') == 'ready', 'Choose Check updates to get the latest MagicShelf update.')
-            source = self.root/state['version']/'magicshelf'
-            require(source.is_dir(), 'The update needs to download again. Choose Check updates.')
-            self.set(**{**state, 'stage': 'installing', 'message': 'Updating MagicShelf. It will reopen automatically.'})
-            try:
-                self.spawn_worker(source)
-            except Exception:
-                self.set(**{**state, 'message': 'The update could not start. Please try Update and reopen again.'})
-                raise
-        return manager.snapshot()
+        require(manager._sync_lock.acquire(blocking=False), 'Please let the current download finish, then try again.')
+        try:
+            with manager._install_request_lock, self.lock:
+                require(not manager.busy and not (manager._install_thread and manager._install_thread.is_alive()), 'Please let the current download finish, then try again.')
+                state = self.snapshot()
+                require(state.get('stage') == 'ready', 'Choose Check updates to get the latest MagicShelf update.')
+                source = self.root/state['version']/'magicshelf'
+                require(source.is_dir(), 'The update needs to download again. Choose Check updates.')
+                # Remember the attempt before spawning so a bad release or worker
+                # interruption cannot cause an automatic restart loop.
+                installing = {**state, 'stage': 'installing', 'automatic_attempted': True,
+                              'reopen': not automatic,
+                              'message': 'Updating MagicShelf.' if automatic else 'Updating MagicShelf. It will reopen automatically.'}
+                self.set(**installing)
+                try:
+                    self.spawn_worker(source)
+                except Exception:
+                    self.set(**{**installing, 'stage': 'ready', 'message': 'The update could not start. Please try Update and reopen again.'})
+                    raise
+            return manager.snapshot()
+        finally:
+            manager._sync_lock.release()

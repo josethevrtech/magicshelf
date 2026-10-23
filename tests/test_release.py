@@ -59,4 +59,9 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(list((self.root/'dist').glob('*.magicshelf')), [])
         self.assertFalse((self.root/'dist/example-catalog.json').exists())
 
+    def test_public_install_link_always_resolves_latest_release(self):
+        readme = (PROJECT/'README.md').read_text()
+        self.assertIn('https://github.com/josethevrtech/magicshelf/releases/latest/download/Install.MagicShelf.desktop', readme)
+        self.assertNotRegex(readme, r'releases/download/v[^/]+/Install\.MagicShelf\.desktop')
+
 if __name__=='__main__':unittest.main()

@@ -41,7 +41,8 @@ def main(source):
             installer.install(verified)
         atomic(status, {'stage': 'current', 'version': state['version'], 'message': 'MagicShelf is up to date.'})
         journal.unlink()
-        subprocess.run([str(current/'bin/magicshelf-vr'), '--show'], check=False, timeout=10, capture_output=True)
+        if state.get('reopen', True):
+            subprocess.run([str(current/'bin/magicshelf-vr'), '--show'], check=False, timeout=10, capture_output=True)
     except Exception:
         # install.py restores the previous release and services on failure.
         atomic(status, {**state, 'stage': 'ready', 'message': 'The update could not finish. Your previous MagicShelf is kept. Try again when ready.'})

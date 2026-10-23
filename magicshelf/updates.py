@@ -230,6 +230,8 @@ class Updates:
         if not self._sync_lock.acquire(blocking=False):
             return self.snapshot()
         try:
+            if self.framework.snapshot().get('stage') == 'installing':
+                return self.snapshot()
             if refresh:
                 self.refresh()
             updated, ready, reviews, failures = 0, 0, 0, 0

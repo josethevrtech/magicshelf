@@ -39,7 +39,16 @@ struct StoreUI{
  void round(Canvas&c,double x,double y,double w,double h,double r,ShelfTheme::Color color){cairo_new_sub_path(c.c);cairo_arc(c.c,x+w-r,y+r,r,-M_PI/2,0);cairo_arc(c.c,x+w-r,y+h-r,r,0,M_PI/2);cairo_arc(c.c,x+r,y+h-r,r,M_PI/2,M_PI);cairo_arc(c.c,x+r,y+r,r,M_PI,3*M_PI/2);cairo_close_path(c.c);ShelfTheme::source(c,color);cairo_fill(c.c);}
  void text(Canvas&c,int x,int y,const std::string&s,int size=20,bool muted=false,int width=1000){cairo_save(c.c);cairo_rectangle(c.c,x,y-size,width,size+9);cairo_clip(c.c);auto color=muted?ShelfTheme::muted:ShelfTheme::text;c.text(x,y,s,size,color.r,color.g,color.b);cairo_restore(c.c);}
  void wrap(Canvas&c,int x,int y,int width,const std::string&s,int size,int lines=4,bool muted=true){std::istringstream words(s);std::string word,line;int n=0;cairo_set_font_size(c.c,size);while(words>>word){auto next=line.empty()?word:line+" "+word;cairo_text_extents_t e{};cairo_text_extents(c.c,next.c_str(),&e);if(e.x_advance>width&&!line.empty()){text(c,x,y+n*(size+9),line,size,muted,width);line=word;if(++n>=lines)return;}else line=next;}if(!line.empty()&&n<lines)text(c,x,y+n*(size+9),line,size,muted,width);}
- void button(Canvas&c,int x,int y,int w,const std::string&label,const std::string&method,const std::string&params="{}",bool primary=false,int h=48){round(c,x,y,w,h,9,primary?ShelfTheme::accent:ShelfTheme::secondary);if(primary){cairo_save(c.c);cairo_rectangle(c.c,x+14,y+8,w-28,h-10);cairo_clip(c.c);c.text(x+16,y+h/2+7,label,19,0,0,0);cairo_restore(c.c);}else text(c,x+16,y+h/2+7,label,19,false,w-28);buttons.push_back({x,y,w,h,method,params});feedback(c,x,y,w,h,method,params);}
+ std::string buttonLabel(Canvas&c,std::string label,int width){
+  cairo_save(c.c);cairo_select_font_face(c.c,"sans",CAIRO_FONT_SLANT_NORMAL,CAIRO_FONT_WEIGHT_NORMAL);cairo_set_font_size(c.c,19);
+  auto fits=[&](const std::string&s){cairo_text_extents_t e{};cairo_text_extents(c.c,s.c_str(),&e);return e.x_advance<=width;};
+  if(!fits(label)){
+   do{size_t end=label.size()-1;while(end>0&&(static_cast<unsigned char>(label[end])&0xc0)==0x80)--end;label.resize(end);}while(!label.empty()&&!fits(label+"…"));
+   label+="…";
+  }
+  cairo_restore(c.c);return label;
+ }
+ void button(Canvas&c,int x,int y,int w,const std::string&label,const std::string&method,const std::string&params="{}",bool primary=false,int h=48){auto display=buttonLabel(c,label,w-32);round(c,x,y,w,h,9,primary?ShelfTheme::accent:ShelfTheme::secondary);if(primary){cairo_save(c.c);cairo_rectangle(c.c,x+14,y+8,w-28,h-10);cairo_clip(c.c);c.text(x+16,y+h/2+7,display,19,0,0,0);cairo_restore(c.c);}else text(c,x+16,y+h/2+7,display,19,false,w-28);buttons.push_back({x,y,w,h,method,params});feedback(c,x,y,w,h,method,params);}
  void art(Canvas&c,json_object*m,int x,int y,int w,int h,int index=0){round(c,x,y,w,h,14,ShelfTheme::artwork);auto*pics=field(m,"screenshots");int n=pics?json_object_array_length(pics):0;if(!n){text(c,x+w/2-20,y+h/2+18,"M",56);return;}auto*p=json_object_array_get_idx(pics,index%n);auto path=textfield(p,"path");auto*s=image(path);if(cairo_surface_status(s)==CAIRO_STATUS_SUCCESS){int iw=cairo_image_surface_get_width(s),ih=cairo_image_surface_get_height(s);double scale=std::min(double(w)/iw,double(h-12)/ih);cairo_save(c.c);cairo_translate(c.c,x+(w-iw*scale)/2,y+(h-ih*scale)/2);cairo_scale(c.c,scale,scale);cairo_set_source_surface(c.c,s,0,0);cairo_paint(c.c);cairo_restore(c.c);}else text(c,x+30,y+70,"Preview unavailable",20,true,w-60);}
  std::string transferLabel(json_object*t){auto stage=textfield(t,"stage");return stage=="downloading"?"Downloading":stage=="checking"?"Checking download":stage=="installing"?"Installing":stage=="ready"?"Ready when Off":stage=="complete"?"Installed · Ready":stage=="setting_up"?"Setting up":stage=="setup_failed"?"Setup needs retry":"Download needs retry";}
  std::string updateLabel(json_object*m){auto status=textfield(m,"update_status");return status=="ready"?"Update ready":status=="review"?"Review update":status=="failed"?"Update needs retry":status=="held"?"Previous version kept":status=="available"?"Update available":"Installed";}
@@ -62,7 +71,7 @@ struct StoreUI{
   button(c,20,199,180,"My Shelf","ui.library","{}",view=="library");
   button(c,20,257,180,"Settings","ui.preferences","{}",view=="settings");
   if(textfield(field(state,"framework_update"),"stage")=="ready")button(c,20,475,182,"App update ready","ui.appupdates");
-  if(auto*t=field(state,"transfer");t&&!setupFocused(find(state,selected))){
+  if(auto*t=field(state,"transfer");t&&textfield(t,"stage")!="complete"&&!setupFocused(find(state,selected))){
    text(c,27,587,"DOWNLOADS",13,true,170);wrap(c,27,618,168,textfield(t,"name"),18,2,false);
    wrap(c,27,684,174,transferLabel(t),16,2);progressBar(c,t,27,723,168);
    if(textfield(t,"stage")=="downloading"||(textfield(t,"stage")=="setting_up"&&json_object_get_double(field(t,"total_bytes"))>0)){
@@ -146,12 +155,12 @@ struct StoreUI{
    ShelfTheme::rect(c,278,y+78,970,1,ShelfTheme::border);
   }
   if(settingsTab=="app"){
-   text(c,278,518,"Updates",24);wrap(c,278,553,650,"Updates download automatically and install while a creation is Off. Checks run every minute. Use Check updates any time.",18,3);
+   text(c,278,518,"Updates",24);wrap(c,278,553,650,"Creations stay up to date automatically. Downloaded updates install while Off.",18,3);
    button(c,1010,522,238,"Check updates","subscriptions.sync");
    auto*app=field(state,"framework_update");auto stage=textfield(app,"stage");
    text(c,278,661,"MagicShelf "+textfield(state,"version"),24);
    wrap(c,278,703,650,textfield(app,"message"),18,3);
-   if(stage=="downloading"){progressBar(c,app,278,798,650);}
+   if(stage=="downloading"){progressBar(c,app,278,754,650);}
    else if(stage=="ready")button(c,970,687,278,"Update and reopen","framework.install","{}",true);
    else if(stage=="failed")button(c,1010,687,238,"Try again","catalog.refresh");
   }
