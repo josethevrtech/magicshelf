@@ -13,11 +13,11 @@ from pathlib import Path
 def system(*args, check=True):
     return subprocess.run(["systemctl", "--user", *args], check=check, timeout=40, capture_output=True, text=True)
 
-def install(source=None):
+def install(source=None, *, automatic=False):
     with contextlib.ExitStack() as resources:
-        return _install(source, resources)
+        return _install(source, resources, automatic)
 
-def _install(source, resources):
+def _install(source, resources, automatic=False):
     source = Path(source).resolve() if source else Path(__file__).resolve().parent
     metadata = json.loads((source / "release.json").read_text())
     import hashlib
@@ -35,11 +35,15 @@ def _install(source, resources):
     root.mkdir(parents=True, exist_ok=True)
     lock = resources.enter_context((root / "install.lock").open("a"))
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    marker = root / 'uninstalled'
+    was_uninstalled = marker.exists()
+    if automatic and marker.exists():
+        raise RuntimeError('MagicShelf was uninstalled. Automatic installation was cancelled.')
     releases = root / "releases"
     releases.mkdir(exist_ok=True)
     target = releases / metadata["version"]
     current = root / "current"
-    previous = current.resolve() if current.is_symlink() else None
+    previous = current.resolve() if current.is_symlink() and not was_uninstalled else None
     if target.exists():
         # Idempotent reinstall only; versioned releases must be immutable.
         if (target / "release.json").read_bytes() != (source / "release.json").read_bytes():
@@ -61,6 +65,7 @@ def _install(source, resources):
         if (units / name).exists():
             shutil.copy2(units / name, backup / name)
     try:
+        marker.unlink(missing_ok=True)
         nextlink = root / "current.next"
         nextlink.unlink(missing_ok=True)
         nextlink.symlink_to(target)
@@ -145,13 +150,28 @@ WantedBy=steamvr.service
         # No % or shell expansion in desktop Exec; quote the complete executable path.
         executable = str(current / "bin/magicshelf").replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%").replace("$", "\\$").replace("`", "\\`")
         app.write_text('[Desktop Entry]\nType=Application\nName=MagicShelf\nComment=A home for my VR creations.\nExec="' + executable + '" open\nIcon=' + str(current / 'icon.png') + '\nTerminal=false\nCategories=Game;\n')
+        uninstall = home / '.local/share/applications/com.josethevrtech.magicshelf.uninstall.desktop'
+        uninstaller = str(current/'uninstall.py').replace('\\', '\\\\').replace('"', '\\"').replace('%', '%%').replace('$', '\\$').replace('`', '\\`')
+        uninstall.write_text('[Desktop Entry]\nType=Application\nName=Uninstall MagicShelf\nComment=Remove MagicShelf and keep saved data\nExec=python3 "'+uninstaller+'" --gui\nIcon='+str(current/'icon.png')+'\nTerminal=false\nCategories=Game;\n')
         desktop = home / "Desktop"
+        try:
+            result = subprocess.run(['xdg-user-dir', 'DESKTOP'], capture_output=True, text=True, timeout=5)
+            configured = Path(getattr(result, 'stdout', '').strip())
+            if result.returncode == 0 and configured.is_absolute() and configured.is_relative_to(home):
+                desktop = configured
+        except (OSError, subprocess.SubprocessError):
+            pass
         if desktop.is_dir():
             shortcut = desktop / "MagicShelf.desktop"
             shutil.copy2(app, shortcut)
             shortcut.chmod(0o755)
+            shortcut = desktop / 'Uninstall MagicShelf.desktop'
+            shutil.copy2(uninstall, shortcut)
+            shortcut.chmod(0o755)
         print("MagicShelf installed. Open MagicShelf on your desktop or in SteamVR's dashboard.")
     except Exception:
+        if was_uninstalled:
+            marker.touch()
         if previous:
             nextlink = root / "current.next"
             nextlink.unlink(missing_ok=True)

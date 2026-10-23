@@ -19,15 +19,19 @@ to your desktop and double-click it. If your desktop asks whether to execute or
 trust the downloaded launcher, allow it. Open the new **MagicShelf** shortcut or
 select **MagicShelf** in SteamVR's dashboard.
 
-The installer runs under your user account and needs no administrator password.
-It verifies the release before installing into `~/.local/share/magicshelf`.
-It does not modify the operating system or restart SteamVR.
+Keep **Install MagicShelf** on your desktop. The same icon installs the latest
+version whenever you need it. No terminal or administrator password is needed.
 
 Install once. MagicShelf downloads updates automatically and applies them when its
 panel is closed. Subscribed creations update while Off, keeping their saved data.
 
 ## Uninstall
 
-```sh
-python3 ~/.local/share/magicshelf/current/uninstall.py
-```
+In Desktop Mode, double-click **Uninstall MagicShelf** and choose **Uninstall**.
+Wait for the confirmation. MagicShelf and its creations stop, and their shortcuts
+are removed. Your creations and saved data are kept for a future reinstall.
+
+Missing the shortcut? Download [Uninstall.MagicShelf.desktop](https://github.com/josethevrtech/magicshelf/releases/latest/download/Uninstall.MagicShelf.desktop)
+to your desktop and open it. This also repairs an incomplete uninstall.
+
+To reinstall, double-click the same **Install MagicShelf** icon again.

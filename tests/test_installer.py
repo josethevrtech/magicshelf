@@ -75,3 +75,22 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual((units / "magicshelf.service").read_text(),"old service")
 
 if __name__ == "__main__":unittest.main()
+
+class UninstalledUpdateTests(InstallerTests):
+    def test_automatic_update_cannot_reinstall_removed_app(self):
+        root=self.home/'.local/share/magicshelf';root.mkdir(parents=True)
+        (root/'uninstalled').touch()
+        with self.assertRaisesRegex(RuntimeError,'uninstalled'):
+            installer.install(self.source,automatic=True)
+        self.assertTrue((root/'uninstalled').exists())
+        self.assertFalse((root/'current').exists())
+    def test_explicit_reinstall_adds_both_desktop_shortcuts(self):
+        root=self.home/'.local/share/magicshelf';root.mkdir(parents=True)
+        (root/'uninstalled').touch()
+        with patch.object(installer.subprocess,'run',return_value=types.SimpleNamespace(returncode=0)):
+            installer.install(self.source)
+        self.assertFalse((root/'uninstalled').exists())
+        shortcut=self.home/'Desktop/Uninstall MagicShelf.desktop'
+        self.assertIn('--gui',shortcut.read_text())
+        self.assertIn('Terminal=false',shortcut.read_text())
+        self.assertTrue(shortcut.stat().st_mode & 0o111)

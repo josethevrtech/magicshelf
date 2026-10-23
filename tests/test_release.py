@@ -59,6 +59,15 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(list((self.root/'dist').glob('*.magicshelf')), [])
         self.assertFalse((self.root/'dist/example-catalog.json').exists())
 
+    def test_recovery_uninstall_icon_pins_standalone_gui_uninstaller(self):
+        desktop=(self.root/'dist/Uninstall.MagicShelf.desktop').read_text()
+        source=base64.b64decode(re.search("b64decode\\('([^']+)'\\)",desktop)[1]).decode()
+        ast.parse(source)
+        self.assertIn('/uninstall-magicshelf.py',source)
+        self.assertIn("'--gui'",source)
+        self.assertIn(hashlib.sha256((self.root/'dist/uninstall-magicshelf.py').read_bytes()).hexdigest(),source)
+        self.assertIn('Terminal=false',desktop)
+
     def test_public_install_link_always_resolves_latest_release(self):
         readme = (PROJECT/'README.md').read_text()
         self.assertIn('https://github.com/josethevrtech/magicshelf/releases/latest/download/Install.MagicShelf.desktop', readme)

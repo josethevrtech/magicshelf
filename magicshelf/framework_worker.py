@@ -15,6 +15,8 @@ from magicshelf.framework_updates import extract_release, release_for
 def main(source):
     home = Path.home()
     root = home/'.local/share/magicshelf'
+    if (root/'uninstalled').exists():
+        return
     status = home/'.config/magicshelf/framework-update.json'
     current = root/'current'
     journal = root/'framework-install.json'
@@ -38,7 +40,7 @@ def main(source):
             verified = extract_release(source.parent/'update.tar.gz', Path(temp), item)
             spec = importlib.util.spec_from_file_location('framework_installer', verified/'install.py')
             installer = importlib.util.module_from_spec(spec);spec.loader.exec_module(installer)
-            installer.install(verified)
+            installer.install(verified, automatic=True)
         atomic(status, {'stage': 'current', 'version': state['version'], 'message': 'MagicShelf is up to date.'})
         journal.unlink()
         if state.get('reopen', True):
