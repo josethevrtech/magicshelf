@@ -6,3 +6,16 @@ dist/
 
 /work/
 /outputs/
+/branding/*.png
+
+# Local configuration and credentials must never enter a release or Git.
+.env
+.env.*
+*.key
+*.pem
+*.log
+/state.json
+/sessions.json
+/object-dock.json
+/module-data/
+/runtime-data/

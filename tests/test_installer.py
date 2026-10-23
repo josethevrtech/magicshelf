@@ -21,6 +21,7 @@ class InstallerTests(unittest.TestCase):
         self.source = self.root / "source";self.source.mkdir();(self.source / "bin").mkdir()
         for name in ("magicshelf", "magicshelf-bootstrap", "magicshelf-vr"):
             path = self.source / "bin" / name;path.write_text("#!/bin/sh\nexit 0\n");path.chmod(0o755)
+        (self.source/'icon.png').write_bytes(b'Fixture logo')
         self.meta = {"version":"0.1.0","architecture":platform.machine(),"files":{str(p.relative_to(self.source)):hashlib.sha256(p.read_bytes()).hexdigest() for p in self.source.rglob("*") if p.is_file()}}
         (self.source / "release.json").write_text(json.dumps(self.meta))
         self.calls = []
@@ -37,6 +38,8 @@ class InstallerTests(unittest.TestCase):
         with patch.object(installer.subprocess,"run",return_value=types.SimpleNamespace(returncode=0)):
             installer.install(self.source)
         self.assertTrue((self.home / "Desktop/MagicShelf.desktop").exists())
+        self.assertEqual((self.home/'.local/share/icons/hicolor/512x512/apps/com.josethevrtech.magicshelf.png').read_bytes(),b'Fixture logo')
+        self.assertIn('Icon=com.josethevrtech.magicshelf', (self.home/'Desktop/MagicShelf.desktop').read_text())
         self.assertTrue((self.home / ".local/share/magicshelf/current").is_symlink())
         self.assertFalse(any("steamvr.service" in call and call[0]=="restart" for call in self.calls))
         self.assertTrue(all("sudo" not in call for call in self.calls))

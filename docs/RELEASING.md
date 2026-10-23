@@ -75,3 +75,14 @@ For creation releases, run the release workflow with the exact manifest version.
 It builds first, verifies that version, creates a draft, uploads the full asset set,
 and only then publishes it as latest. Keep distribution inputs pinned and record
 their authors and permission separately from the source-code license.
+
+## Release privacy
+
+Framework downloads include only the reviewed paths in `tools/framework-files.json`
+and the explicit assets listed by `tools/build_release.py`. Add new runtime source
+files to that list deliberately. Do not include settings, logs, capture snapshots,
+creation data, credentials, or a development home directory. Archive ownership and
+timestamps are normalized before publishing.
+
+The creation packager rejects known private configuration and credential paths.
+Stage only code and redistributable assets, never a running creation's data folder.

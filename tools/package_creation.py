@@ -24,7 +24,13 @@ def build(source, output, repository):
     paths = sorted(source.rglob("*"))
     require(paths and len(paths) <= 4096, "Too many package entries")
     for path in paths:
-        relative(path.relative_to(source).as_posix())
+        name = path.relative_to(source)
+        relative(name.as_posix())
+        private = {'.git', '.ssh', '.aws', '.gnupg', 'module-data', 'runtime-data'}
+        require(not private.intersection(name.parts) and not name.name.startswith('.env')
+                and name.name not in {'id_rsa', 'id_ed25519', 'id_ecdsa', 'loginusers.vdf'}
+                and not (len(name.parts) == 1 and name.name in {'state.json', 'sessions.json', 'object-dock.json'}),
+                'Private settings or credentials cannot be packaged: ' + name.as_posix())
         mode = path.lstat().st_mode
         require(stat.S_ISREG(mode) or stat.S_ISDIR(mode), "Links and special files are not allowed")
     files = [p for p in paths if p.is_file()]

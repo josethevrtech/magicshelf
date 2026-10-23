@@ -35,3 +35,10 @@ Missing the shortcut? Download [Uninstall.MagicShelf.desktop](https://github.com
 to your desktop and open it. This also repairs an incomplete uninstall.
 
 To reinstall, double-click the same **Install MagicShelf** icon again.
+
+## Logo files
+
+[Editable SVG](branding/magicshelf.svg) · [PNG](https://github.com/josethevrtech/magicshelf/releases/latest/download/MagicShelf.png)
+
+The app, installer and uninstaller share the same logo. On a new device, opening
+the installer once registers the logo with the desktop.
