@@ -3,9 +3,10 @@ import json
 import os
 import socket
 from pathlib import Path
+from .session import user_runtime
 
 def runtime_dir():
-    return Path(os.environ.get("XDG_RUNTIME_DIR", "/run/user/" + str(os.getuid()))) / "magicshelf"
+    return user_runtime() / "magicshelf"
 
 def request(method, params=None, timeout=235):
     packet = json.dumps({"api_version": 1, "method": method, "params": params or {}}).encode() + b"\n"

@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from magicshelf.manager import atomic
 from magicshelf.contracts import load, require
 from magicshelf.framework_updates import extract_release, release_for
+from magicshelf.session import service_environment
 
 
 def main(source):
@@ -29,7 +30,7 @@ def main(source):
         require(previous.parent == root/'releases' and previous.is_dir(), 'Previous MagicShelf release is missing')
         link = root/'current.recovery'
         link.unlink(missing_ok=True);link.symlink_to(previous);os.replace(link, current)
-        subprocess.run(['systemctl', '--user', 'restart', 'magicshelf.service', 'magicshelf-vr.service'], check=True, timeout=60)
+        subprocess.run(['systemctl', '--user', 'restart', 'magicshelf.service', 'magicshelf-vr.service'], env=service_environment(), check=True, timeout=60)
         atomic(status, {**state, 'stage': 'ready', 'message': 'The update was interrupted. Your previous MagicShelf is restored. Try again when ready.'})
         journal.unlink()
         return

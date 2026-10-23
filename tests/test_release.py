@@ -7,6 +7,8 @@ import io
 import json
 import re
 import shutil
+import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -68,6 +70,12 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn(hashlib.sha256((self.root/'dist/uninstall-magicshelf.py').read_bytes()).hexdigest(),source)
         self.assertIn('Terminal=false',desktop)
         self.assertIn('Icon=com.josethevrtech.magicshelf',desktop)
+
+    def test_recovery_uninstaller_works_without_an_installed_framework(self):
+        result = subprocess.run([sys.executable, '-I', str(self.root/'dist/uninstall-magicshelf.py'), '--help'],
+                                cwd=self.root/'dist', capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('--gui', result.stdout)
 
     def test_all_download_icons_embed_the_same_public_logo(self):
         for name in ('Install','Uninstall'):

@@ -3,7 +3,7 @@
 import argparse, base64, gzip, hashlib, json, os, shutil, stat, tarfile, tempfile, zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent.parent
-VERSION='0.3.16'
+VERSION='0.3.17'
 REPO='josethevrtech/magicshelf'
 
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -76,7 +76,10 @@ except Exception as error:
     (out/'Install.MagicShelf.desktop').chmod(0o755)
     # Standalone recovery uninstaller also works after a partial old removal.
     uninstaller=out/'uninstall-magicshelf.py'
-    shutil.copy2(ROOT/'uninstall.py',uninstaller)
+    # The recovery download must also work when no framework is installed.
+    uninstaller.write_text((ROOT/'uninstall.py').read_text().replace(
+        'from magicshelf.session import service_environment',
+        (ROOT/'magicshelf/session.py').read_text()))
     uninstall_source=launcher_source.replace('/install-magicshelf.py', '/uninstall-magicshelf.py').replace(sha(bootstrap),sha(uninstaller)).replace("str(path)]", "str(path),'--gui']")
     code="import base64;exec(base64.b64decode('"+base64.b64encode(uninstall_source.encode()).decode()+"'))"
     escaped=code.replace('\\','\\\\').replace('"','\\"').replace('%','%%')

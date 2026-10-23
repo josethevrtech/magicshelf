@@ -9,15 +9,28 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+import importlib.util
+
+# Automatic updates import this installer inside the previous framework. Load
+# the verified new helper directly, even when the old package is already loaded.
+_session_spec = importlib.util.spec_from_file_location('installer_session', Path(__file__).resolve().parent/'magicshelf/session.py')
+_session = importlib.util.module_from_spec(_session_spec)
+_session_spec.loader.exec_module(_session)
+service_environment, user_runtime = _session.service_environment, _session.user_runtime
 
 def system(*args, check=True):
-    return subprocess.run(["systemctl", "--user", *args], check=check, timeout=40, capture_output=True, text=True)
+    result = subprocess.run(["systemctl", "--user", *args], env=service_environment(), timeout=40, capture_output=True, text=True)
+    if check and result.returncode:
+        raise RuntimeError('Could not start MagicShelf services: ' + (result.stderr.strip() or result.stdout.strip() or 'systemctl failed'))
+    return result
 
 def install(source=None, *, automatic=False):
     with contextlib.ExitStack() as resources:
         return _install(source, resources, automatic)
 
 def _install(source, resources, automatic=False):
+    if os.geteuid() == 0:
+        raise RuntimeError('Open Install MagicShelf from your own desktop. No administrator password is needed.')
     source = Path(source).resolve() if source else Path(__file__).resolve().parent
     metadata = json.loads((source / "release.json").read_text())
     import hashlib
@@ -30,6 +43,8 @@ def _install(source, resources, automatic=False):
         raise RuntimeError("This MagicShelf download is for Linux " + metadata["architecture"])
     if not (Path("/opt/steamvr/bin") / ("linuxarm64" if metadata["architecture"] == "aarch64" else "linux64") / "libopenvr_api.so").is_file():
         raise RuntimeError("Install and start SteamVR normally before installing MagicShelf.")
+    # Check the user service connection before staging or changing integration.
+    system('show', '--property=Version', '--value')
     home = Path.home()
     root = home / ".local/share/magicshelf"
     root.mkdir(parents=True, exist_ok=True)
@@ -113,7 +128,7 @@ WantedBy=steamvr.service
         (config / "magicshelf.vrmanifest").write_text(json.dumps(manifest, indent=2) + "\n")
         system("enable", "magicshelf.service", "magicshelf-vr.service")
         system("restart", "magicshelf.service")
-        runtime = Path(os.environ.get("XDG_RUNTIME_DIR", "/run/user/" + str(os.getuid()))) / "magicshelf"
+        runtime = user_runtime() / "magicshelf"
         sys.path.insert(0, str(current))
         from magicshelf.client import request
         for attempt in range(50):
