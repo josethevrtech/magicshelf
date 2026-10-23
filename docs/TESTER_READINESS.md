@@ -1,6 +1,6 @@
 # Exclusive testing readiness
 
-MagicShelf 0.3.11 provides a graphical installer, automatic creation setup and an
+MagicShelf 0.3.14 provides a graphical installer, automatic creation setup and an
 in-app framework updater for Steam Frame. Creations retain independent repositories
 and subscriptions. Creations require no payment or separate MagicShelf account.
 
@@ -16,8 +16,11 @@ and subscriptions. Creations require no payment or separate MagicShelf account.
 4. Turn the creation On. Configure, Off and the shelf controls remain on its page
    and collection card.
 5. Creation updates download in the background and install when that creation is
-   Off. MagicShelf updates download separately and offer **Update and reopen**.
-   A framework upgrade leaves running creations and SteamVR running.
+   Off. MagicShelf updates download separately and install after its panel has
+   been closed for 30 seconds, without interrupting running creations or SteamVR.
+   **Update and reopen** is also available for an immediate update. No repeat
+   desktop installation is needed. Failed updates keep the working version and
+   wait for a manual retry rather than repeatedly restarting.
 
 Android Phone (Virtual) 0.2.6 declares Steam's Android support and
 prepares its private runtime safely. Smartphone Digivice 0.2.5 bundles its game

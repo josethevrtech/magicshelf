@@ -598,3 +598,48 @@ Scheduling and CDN propagation are not instantaneous.
   other creations were unchanged and SteamVR kept PID 2552.
 - The final test state leaves Pocket Pikachu uninstalled and unsubscribed, with
   its public preview and download available in Discover.
+
+## 0.3.14 public beta validation — October 23, 2026
+
+The installer link now always selects the latest published desktop launcher.
+MagicShelf downloads its own updates automatically and applies them after its
+panel has been closed for 30 seconds. The native host reports current visibility,
+activity and process identity; missing, stale or busy signals defer installation.
+Creation downloads and setup also defer it. A failed attempt is retained across
+restarts for manual retry, preventing automatic restart loops. An automatic
+upgrade does not open the dashboard over the user's current activity.
+
+The app update progress bar no longer overlaps Restore defaults. Completed
+creation downloads leave the sidebar, and long button labels use an ellipsis.
+
+- All 125 Python checks pass locally and on Frame. Native navigation, input
+  targets, persistent textures, grab/depth and docking regressions pass.
+- An empty MagicShelf configuration and data directory installed successfully
+  on the prepared Frame, showing all three published creations. The user's
+  original data and preferences were kept separately for restoration.
+- Android Phone 0.2.6, Smartphone Digivice 0.2.5 and Pocket Pikachu 0.3.2 downloaded
+  through the normal public subscription path and installed automatically.
+  Existing Steam support was detected. All three started and reported readiness;
+  Phone delivered a 720×1600 Android screen and Digivice a 480×1046 live game frame.
+- Configure and return-to-dock commands kept each creation's process alive.
+  Off stopped each creation; the Android container was exited. Uninstall kept
+  saved files and downloadable listings, including after a manager restart.
+  Shelf/window settings applied, reset and restored correctly.
+- An automatic 0.3.13-to-0.3.14 transition ran through the independent installer
+  worker after a 30-second idle period. Pocket Pikachu and SteamVR kept their
+  process IDs, preferences remained unchanged, and the dashboard stayed closed.
+  This test staged the verified archive locally to exercise the new scheduler
+  before publication; public download verification is a separate release check.
+- The live disposable-creation recovery probe passed: a running update kept its
+  process, turning Off installed the downloaded cache, a failed first launch
+  restored the working version, and the save survived without repeating the bad
+  update. This uses real services with local fixture downloads.
+- Discover, My Shelf, all app settings and every creation's details, settings,
+  credits and links rendered from actual device state with valid, nonoverlapping
+  controls. Screenshot galleries and update progress were visually inspected.
+
+This is a clean app installation on an existing development Frame, not a factory
+reset or a different Steam account. First-time Steam support entitlement on a
+new user's account, physical controller interaction and a full device reboot
+remain separate human acceptance checks. The checks above do not establish
+that arbitrary future creation releases are fault-free.

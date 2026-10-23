@@ -147,6 +147,7 @@ def serve():
         while True:
             try:
                 manager.setup.tick()
+                manager.framework.automatic_install()
                 manager.publish()
             except Exception as e:
                 print("MagicShelf state:", e, flush=True)
@@ -160,7 +161,7 @@ def serve():
         time.sleep(10)
         while True:
             try:
-                if not manager.busy:
+                if not manager.busy and manager.framework.snapshot().get('stage') != 'installing':
                     manager.sync_subscriptions()
                     manager.framework.check()
             except Exception as error:

@@ -13,7 +13,8 @@
    matching `vVERSION` tag and attach all the generated assets. A draft release
    keeps the download links unavailable until the complete set is ready.
 5. Publish the release only after the checksum-pinned desktop launcher refers to
-   that exact tag. The desktop launcher verifies the bootstrap, the bootstrap
+   that exact tag. The README links to the latest release's desktop launcher.
+   The desktop launcher verifies the bootstrap, the bootstrap
    verifies the framework archive, and the framework verifies its file index.
 6. Download the public desktop file and run it on a clean supported machine.
    Confirm no private paths, saves, account data, third-party game/model assets,
