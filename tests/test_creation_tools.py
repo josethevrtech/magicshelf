@@ -57,6 +57,15 @@ class CreationToolsTests(unittest.TestCase):
         with self.assertRaisesRegex(ContractError, 'executable'):
             self.builder.build(self.source, self.root / 'dist', 'example/clock')
 
+    def test_rejects_accidental_local_settings_and_credentials(self):
+        for name in ('.env', 'state.json', 'sessions.json', 'object-dock.json', 'id_ed25519', 'module-data/save.json'):
+            with self.subTest(name=name):
+                path=self.source/name;path.parent.mkdir(exist_ok=True);path.write_text('Private fixture')
+                with self.assertRaisesRegex(ContractError,'Private settings'):
+                    self.builder.build(self.source,self.root/'dist','example/clock')
+                path.unlink()
+                if path.parent != self.source:path.parent.rmdir()
+
     def test_sdk_export_has_contracts_and_no_application_or_creation_payload(self):
         archive = tool('build_sdk').build(self.root / 'sdk')
         with tarfile.open(archive) as tar:

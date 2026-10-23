@@ -111,6 +111,11 @@ def serve():
         def do_GET(self):
             if not self.trusted():
                 return self.send(403, b'{}')
+            if self.path == '/icon.png':
+                try:
+                    return self.send(200, (Path(__file__).resolve().parent.parent/'icon.png').read_bytes(), 'image/png')
+                except OSError:
+                    return self.send(404, b'{}')
             if self.path.startswith("/media/"):
                 from .storefront import media_path
                 try:

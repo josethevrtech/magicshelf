@@ -147,12 +147,15 @@ WantedBy=steamvr.service
                 time.sleep(.1)
         app = home / ".local/share/applications/com.josethevrtech.magicshelf.desktop"
         app.parent.mkdir(parents=True, exist_ok=True)
+        icon = home / '.local/share/icons/hicolor/512x512/apps/com.josethevrtech.magicshelf.png'
+        icon.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(current/'icon.png', icon)
         # No % or shell expansion in desktop Exec; quote the complete executable path.
         executable = str(current / "bin/magicshelf").replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%").replace("$", "\\$").replace("`", "\\`")
-        app.write_text('[Desktop Entry]\nType=Application\nName=MagicShelf\nComment=A home for my VR creations.\nExec="' + executable + '" open\nIcon=' + str(current / 'icon.png') + '\nTerminal=false\nCategories=Game;\n')
+        app.write_text('[Desktop Entry]\nType=Application\nName=MagicShelf\nComment=A home for my VR creations.\nExec="' + executable + '" open\nIcon=com.josethevrtech.magicshelf\nTerminal=false\nCategories=Game;\n')
         uninstall = home / '.local/share/applications/com.josethevrtech.magicshelf.uninstall.desktop'
         uninstaller = str(current/'uninstall.py').replace('\\', '\\\\').replace('"', '\\"').replace('%', '%%').replace('$', '\\$').replace('`', '\\`')
-        uninstall.write_text('[Desktop Entry]\nType=Application\nName=Uninstall MagicShelf\nComment=Remove MagicShelf and keep saved data\nExec=python3 "'+uninstaller+'" --gui\nIcon='+str(current/'icon.png')+'\nTerminal=false\nCategories=Game;\n')
+        uninstall.write_text('[Desktop Entry]\nType=Application\nName=Uninstall MagicShelf\nComment=Remove MagicShelf and keep saved data\nExec=python3 "'+uninstaller+'" --gui\nIcon=com.josethevrtech.magicshelf\nTerminal=false\nCategories=Game;\n')
         desktop = home / "Desktop"
         try:
             result = subprocess.run(['xdg-user-dir', 'DESKTOP'], capture_output=True, text=True, timeout=5)

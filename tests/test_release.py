@@ -21,7 +21,7 @@ builder = importlib.util.module_from_spec(spec);spec.loader.exec_module(builder)
 class ReleaseTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory();self.root = Path(self.temp.name)
-        for directory in ("magicshelf","bin","tools","examples"):
+        for directory in ("magicshelf","bin","tools","examples","branding"):
             shutil.copytree(PROJECT / directory, self.root / directory, ignore=shutil.ignore_patterns("__pycache__"))
         for name in ("catalog.json","collections.json","shelf.json","install.py","uninstall.py","LICENSE","OPENVR-LICENSE.txt"):
             shutil.copy2(PROJECT / name,self.root / name)
@@ -67,6 +67,33 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("'--gui'",source)
         self.assertIn(hashlib.sha256((self.root/'dist/uninstall-magicshelf.py').read_bytes()).hexdigest(),source)
         self.assertIn('Terminal=false',desktop)
+        self.assertIn('Icon=com.josethevrtech.magicshelf',desktop)
+
+    def test_all_download_icons_embed_the_same_public_logo(self):
+        for name in ('Install','Uninstall'):
+            desktop=(self.root/f'dist/{name}.MagicShelf.desktop').read_text()
+            code=base64.b64decode(re.search("b64decode\\('([^']+)'\\)",desktop)[1]).decode()
+            encoded=re.search("write_bytes\\(base64.b64decode\\('([^']+)'\\)",code)[1]
+            self.assertEqual(base64.b64decode(encoded),(self.root/'build/icon.png').read_bytes())
+            self.assertIn('Icon=com.josethevrtech.magicshelf',desktop)
+            self.assertNotIn('applications-games',desktop)
+        self.assertEqual((self.root/'dist/MagicShelf.png').read_bytes(),(self.root/'build/icon.png').read_bytes())
+
+    def test_release_cannot_pick_up_local_settings_or_build_account_metadata(self):
+        for name in ('magicshelf/state.json','magicshelf/private.py','bin/.env','bin/id_rsa'):
+            (self.root/name).write_text('PRIVATE TEST DATA MUST NOT SHIP')
+        with patch.object(builder,'ROOT',self.root),contextlib.redirect_stdout(io.StringIO()):builder.build('aarch64')
+        with tarfile.open(self.root/f'dist/magicshelf-{builder.VERSION}-linux-aarch64.tar.gz') as tar:
+            names=tar.getnames()
+            for name in ('magicshelf/state.json','magicshelf/private.py','bin/.env','bin/id_rsa'):
+                self.assertNotIn('magicshelf/'+name,names)
+            for item in tar.getmembers():
+                self.assertEqual((item.uid,item.gid,item.uname,item.gname,item.mtime),(0,0,'','',0))
+
+    def test_release_rejects_a_symlink_in_an_approved_source_path(self):
+        target=self.root/'magicshelf/client.py';target.unlink();target.symlink_to(self.root/'LICENSE')
+        with patch.object(builder,'ROOT',self.root),self.assertRaisesRegex(RuntimeError,'regular file'):
+            builder.build('aarch64')
 
     def test_public_install_link_always_resolves_latest_release(self):
         readme = (PROJECT/'README.md').read_text()
