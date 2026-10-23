@@ -126,7 +126,7 @@ int main(int argc,char**argv){try{
  std::signal(SIGTERM,stop);std::signal(SIGINT,stop);std::signal(SIGPIPE,SIG_IGN);
  bool command=argc==2;vr::EVRInitError error;vr::VR_Init(&error,command?vr::VRApplication_Background:vr::VRApplication_Overlay);
  if(error)throw std::runtime_error(vr::VR_GetVRInitErrorAsEnglishDescription(error));
- if(command&&std::string(argv[1])=="--unregister"){auto path=std::filesystem::path(getenv("HOME"))/".config/magicshelf/magicshelf.vrmanifest";vr::VRApplications()->RemoveApplicationManifest(path.c_str());}
+ if(command&&std::string(argv[1])=="--unregister"){auto path=std::filesystem::path(getenv("HOME"))/".config/magicshelf/magicshelf.vrmanifest";vr::VRApplications()->RemoveApplicationManifest(path.c_str());if(vr::VRApplications()->IsApplicationInstalled("com.josethevrtech.magicshelf"))throw std::runtime_error("MagicShelf is still registered with SteamVR");}
  else if(command&&std::string(argv[1])=="--show"){
   vr::VROverlayHandle_t handle=0;auto until=std::chrono::steady_clock::now()+std::chrono::seconds(10);
   while(vr::VROverlay()->FindOverlay("com.josethevrtech.magicshelf",&handle)!=vr::VROverlayError_None){if(std::chrono::steady_clock::now()>until)throw std::runtime_error("MagicShelf dashboard did not start");std::this_thread::sleep_for(std::chrono::milliseconds(100));}

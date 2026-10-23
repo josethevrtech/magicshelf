@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Release-pinned graphical setup for SteamOS and Steam Frame."""
+"""Reusable graphical setup that verifies the latest official release."""
 import contextlib
 import hashlib
+import json
 import os
 import pathlib
 import platform
+import re
 import shutil
 import subprocess
 import tarfile
@@ -16,6 +18,25 @@ import urllib.request
 
 class Cancelled(Exception):
     pass
+
+
+def latest_release():
+    releases = 'https://github.com/josethevrtech/magicshelf/releases/'
+    with urllib.request.urlopen(releases+'latest/download/framework.json', timeout=30) as response:
+        data = response.read(65537)
+    if len(data) > 65536:
+        raise RuntimeError('The download information could not be verified. Please try again.')
+    data = json.loads(data)
+    version = data.get('version', '')
+    if data.get('schema_version') != 1 or not isinstance(version, str) or not re.fullmatch(r'\d+\.\d+\.\d+', version):
+        raise RuntimeError('The download information could not be verified. Please try again.')
+    item = data.get('artifacts', {}).get('@ARCH@', {})
+    expected = releases+f'download/v{version}/magicshelf-{version}-linux-@ARCH@.tar.gz'
+    if (item.get('url') != expected or not isinstance(item.get('sha256'), str)
+            or not re.fullmatch('[a-f0-9]{64}', item['sha256'])
+            or type(item.get('size_bytes')) is not int or not 0 < item['size_bytes'] <= 100*1024*1024):
+        raise RuntimeError('The latest download is not available for this device yet. Please try again later.')
+    return {**item, 'version': version}
 
 
 class Progress:
@@ -49,12 +70,13 @@ def install():
         raise RuntimeError('This download is for Steam Frame. Please use the MagicShelf download for your device.')
     progress=Progress()
     try:
+        item=latest_release()
         with tempfile.TemporaryDirectory(prefix='magicshelf-install-') as temp:
             base=pathlib.Path(temp);archive=base/'magicshelf.tar.gz'
             for attempt in range(3):
                 try:
                     archive.unlink(missing_ok=True)
-                    with urllib.request.urlopen('@URL@',timeout=30) as response,archive.open('xb') as output:
+                    with urllib.request.urlopen(item['url'],timeout=30) as response,archive.open('xb') as output:
                         total=int(response.headers.get('Content-Length',0));size=0;digest=hashlib.sha256()
                         while chunk:=response.read(65536):
                             size+=len(chunk)
@@ -65,7 +87,7 @@ def install():
                     if attempt==2:raise
                     time.sleep(attempt+1)
             progress.stage('Checking the download…')
-            if digest.hexdigest()!='@SHA256@':raise RuntimeError('The download did not pass verification. Nothing was installed. Please try again.')
+            if size!=item['size_bytes'] or digest.hexdigest()!=item['sha256']:raise RuntimeError('The download did not pass verification. Nothing was installed. Please try again.')
             with tarfile.open(archive) as tar:
                 members=tar.getmembers()
                 if len(members)>8192 or sum(m.size for m in members)>400*1024*1024:raise RuntimeError('The download could not be verified. Please try again.')
@@ -73,6 +95,9 @@ def install():
                     p=pathlib.PurePosixPath(m.name)
                     if p.is_absolute() or '..' in p.parts or not p.parts or p.parts[0]!='magicshelf' or not (m.isfile() or m.isdir()):raise RuntimeError('The download could not be verified. Please try again.')
                 tar.extractall(base,filter='data')
+            metadata=json.loads((base/'magicshelf/release.json').read_text())
+            if metadata.get('version')!=item['version'] or metadata.get('architecture')!='@ARCH@':
+                raise RuntimeError('The download does not match your device. Nothing was installed.')
             progress.stage('Setting up MagicShelf…')
             result=subprocess.run(['python3',str(base/'magicshelf/install.py')],capture_output=True,text=True)
             log=pathlib.Path.home()/'.local/state/magicshelf/install.log';log.parent.mkdir(parents=True,exist_ok=True);log.write_text(result.stdout+result.stderr);log.chmod(0o600)
