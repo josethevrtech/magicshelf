@@ -6,7 +6,7 @@
       "schema_version": 1,
       "api_version": 2,
       "id": "org.magicshelf.android-phone",
-      "version": "0.2.9",
+      "version": "0.2.14",
       "name": "Android Phone (Virtual)",
       "description": "A virtual Android phone, right beside you in VR.",
       "author": "josethevrtech",
@@ -37,7 +37,7 @@
       ],
       "category": "Utilities",
       "tagline": "A little Android. A lot of possibility.",
-      "about": "Android Phone (Virtual) keeps your Android apps within reach. Pick up the phone, move it around your space, or return it to the shelf. Its screen supports controller taps, swipes, typing and brightness controls. Turn it off to stop Android and its audio; installed apps and data remain for next time.",
+      "about": "Android Phone (Virtual) keeps everyday apps within reach: notes, calendar, clock, calculator, files, gallery, music, podcasts, radio, video and a web browser. Its own Apps & media page opens streaming services, app stores and Google web apps. First setup downloads about 214 MB. Some apps require sign-in; Google Play Services and DRM are not provided, and service compatibility varies. Pick up the phone or return it to the shelf. Off stops Android and its audio; installed apps and data remain for next time.",
       "screenshots": [
         {
           "url": "https://raw.githubusercontent.com/josethevrtech/magicshelf-android-phone/main/media/phone-home.png",
@@ -67,9 +67,9 @@
           ]
         }
       ],
-      "url": "https://github.com/josethevrtech/magicshelf-android-phone/releases/download/v0.2.9/org.magicshelf.android-phone-0.2.9-linux-aarch64.magicshelf",
-      "sha256": "2a53bbdf83ad1615d66bdecf32cede38556e3b49fd3e373c13f6a9e319d097ea",
-      "size_bytes": 124220,
+      "url": "https://github.com/josethevrtech/magicshelf-android-phone/releases/download/v0.2.14/org.magicshelf.android-phone-0.2.14-linux-aarch64.magicshelf",
+      "sha256": "ecb8b7902350cf29d17a38cfcfbdd8301e3f50ef0ee16f7036f25e0761166e75",
+      "size_bytes": 135822,
       "collection_url": "https://github.com/josethevrtech/magicshelf-android-phone/releases/latest/download/catalog.json"
     },
     {
