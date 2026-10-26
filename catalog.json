@@ -168,7 +168,7 @@
       "schema_version": 1,
       "api_version": 2,
       "id": "org.magicshelf.pocket-pikachu",
-      "version": "0.3.11",
+      "version": "0.3.13",
       "name": "Pocket Pikachu",
       "description": "A nostalgic Pocket Pikachu with headset steps, original-style settings, a daily alarm and native controller play.",
       "author": "josethevrtech",
@@ -184,7 +184,7 @@
       "startup_timeout_sec": 30,
       "category": "Companions",
       "tagline": "Every step brings you closer.",
-      "about": "Walk, work out, and grow your friendship with Pikachu. Earn watts for gifts and slots. Grip to pick up; shake to return to the shelf. The left stick or D-pad plays, with A/B/X/Y for confirm/back/friendship/settings. Move the holding stick up/down to push/pull directly. When held in the left hand, use its D-pad for play. Set the clock, alarm and sound inside the handheld.",
+      "about": "MEET PIKACHU\nWalk and spend time with Pikachu, earn watts, and give gifts to grow your friendship. He follows his own daily routines and sleeps at night.\n\nFIRST START\nPress A to open the Poke Ball. Set the clock: Left/Right selects hour or minute, Up/Down changes it, and A saves.\n\nFRAME CONTROLS\nA: confirm. B: back/cancel. X: friendship. Y: settings. You can also point at the handheld buttons and click them.\n\nFIND A MENU\nWhile Pikachu is on screen, Left/Right selects the top icons: Clock, Gift, or Slots. Press A to open the selected icon. B returns to Pikachu; finish an active slot round before leaving.\n\nEARN & GIVE WATTS\nKeep the creation On and move with your headset worn. Estimated walking steps earn 1 watt per 20 steps. Open Gift, use Up/Down to change a digit, and press A to advance through the digits to GIVE. Press A on GIVE to spend that amount. B goes back. Giving 0 watts can upset Pikachu!\n\nPLAY SLOTS\nYou need 5 watts per round. Open Slots and press A to start, then press A to stop each reel in turn. Matching symbols can win watts; gambling can also lose them.\n\nSETTINGS & ALARM\nY opens RESET, SOUND and TIME SET. Up/Down selects; A confirms. RESET here clears only the visible step counter. The tiny recessed reset button clears the entire pet, so avoid it unless starting over.\nOn Clock, A toggles the alarm. With it On, press Down then A to edit: Left/Right selects hour/minute, Up/Down changes it, A saves, B cancels. Any handheld button dismisses a ringing alarm.\n\nPICK UP & PLACE\nGrip the housing to hold it; release to place. Center sticks after pickup. The holding stick pushes/pulls directly. Hold in your right hand to navigate with the left stick or D-pad. When held in your left hand, use its D-pad to play. Shake deliberately to return to the dock; Menu/View also returns home.\n\nProgress saves automatically. Turning Off pauses steps and alarms.",
       "credits": [
         {
           "name": "Alberto-rp",
@@ -211,13 +211,13 @@
       ],
       "screenshots": [
         {
-          "url": "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/download/v0.3.11/pocket-pikachu.png",
+          "url": "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/download/v0.3.13/pocket-pikachu.png",
           "caption": "Pocket Pikachu\u2019s live pixel display inside Wikiti\u2019s yellow handheld model."
         }
       ],
-      "url": "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/download/v0.3.11/org.magicshelf.pocket-pikachu-0.3.11-linux-aarch64.magicshelf",
-      "sha256": "b21820c32ddb24e9ea2bc8146fcf8cad4b206123988f36db7320cc78917cf06d",
-      "size_bytes": 2625147,
+      "url": "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/download/v0.3.13/org.magicshelf.pocket-pikachu-0.3.13-linux-aarch64.magicshelf",
+      "sha256": "83b5341bf174baf2cda371cfc6d71fa8e20634abcdecac2ce97281785a3cc645",
+      "size_bytes": 2633416,
       "collection_url": "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/latest/download/catalog.json"
     }
   ]
