@@ -7,6 +7,7 @@
 #include <thread>
 #include <mutex>
 #include <memory>
+#include <set>
 
 static constexpr int RenderScale=2;
 static constexpr float DashboardWidthMeters=1.8f;
@@ -59,6 +60,7 @@ void dashboard(){
  using State=std::unique_ptr<json_object,decltype(&json_object_put)>;
  State state(json_tokener_parse("{\"modules\":[],\"message\":\"Connecting to MagicShelf...\"}"),json_object_put);
  using Clock=std::chrono::steady_clock;auto poll=Clock::now(),dockTick=poll,activityTick=poll;
+ auto nextNotice=poll;std::set<std::string> delivered;std::set<vr::VRNotificationId> noticeIds;
  uint64_t frames=0,fullFrames=0,partialFrames=0;double peakMs=0;
  while(running){
   auto now=Clock::now();
@@ -71,6 +73,20 @@ void dashboard(){
    if(std::isfinite(width)&&width>=1.2f&&width<=2.4f&&fabsf(width-appliedWidth)>.001f){o->SetOverlayWidthInMeters(panel,width);appliedWidth=width;}
   }
   bool working=busy||boolfield(j,"busy")||textfield(field(j,"framework_update"),"stage")=="installing";
+  if(!working&&now>=nextNotice){
+   nextNotice=now+std::chrono::seconds(30);auto*notices=field(j,"update_notices");
+   for(size_t i=0;notices&&i<json_object_array_length(notices);i++){
+    auto*n=json_object_array_get_idx(notices,i);auto identity=textfield(n,"id")+":"+textfield(n,"token");
+    if(boolfield(n,"announced")||boolfield(n,"dismissed")||delivered.count(identity))continue;
+    auto name=textfield(n,"name");if(name.size()>110){size_t end=110;while(end&&((unsigned char)name[end]&0xc0)==0x80)--end;name.resize(end);}
+    auto message=name+" update ready\nKeep playing. It installs when Off. Open MagicShelf for options.";
+    vr::VRNotificationId id=0;auto*notifications=vr::VRNotifications();
+    auto result=notifications?notifications->CreateNotification(panel,0,vr::EVRNotificationType_Transient,message.c_str(),vr::EVRNotificationStyle_Application,nullptr,&id):vr::VRNotificationError_ServiceUnavailable;
+    if(result==vr::VRNotificationError_OK){delivered.insert(identity);noticeIds.insert(id);action("notifications.ack",noticeArgs(n,"announced"));}
+    else{nextNotice=now+std::chrono::seconds(60);std::cerr<<"MagicShelf update toast unavailable: "<<result<<" (notice remains in Updates ready)\n";}
+    break;
+   }
+  }
   if(now>=activityTick){
    // Publish even while hidden. Atomic replacement prevents partial heartbeats.
    auto path=dir+"/dashboard-activity.json";
@@ -79,8 +95,13 @@ void dashboard(){
    activity.close();std::filesystem::rename(path+".next",path);activityTick=now+std::chrono::seconds(1);
   }
   vr::VREvent_t event;
-  while(vr::VRSystem()->PollNextEvent(&event,sizeof(event)))if(event.eventType==vr::VREvent_Quit){vr::VRSystem()->AcknowledgeQuit_Exiting();running=false;}
+  while(vr::VRSystem()->PollNextEvent(&event,sizeof(event))){
+   if(event.eventType==vr::VREvent_Quit){vr::VRSystem()->AcknowledgeQuit_Exiting();running=false;}
+   if(event.eventType==vr::VREvent_Notification_BeginInteraction&&noticeIds.count(event.data.notification.notificationId)){ui.view="updates";ui.selected.clear();ui.reviewId.clear();input.cancel();o->ShowDashboard("com.josethevrtech.magicshelf");}
+  }
   while(o->PollNextOverlayEvent(panel,&event,sizeof(event))){
+   if(event.eventType==vr::VREvent_Notification_BeginInteraction&&noticeIds.count(event.data.notification.notificationId)){ui.view="updates";ui.selected.clear();ui.reviewId.clear();input.cancel();o->ShowDashboard("com.josethevrtech.magicshelf");continue;}
+   if(event.eventType==vr::VREvent_Notification_Destroyed){noticeIds.erase(event.data.notification.notificationId);continue;}
    if(event.eventType==vr::VREvent_OverlayClosed){o->HideOverlay(panel);input.cancel();continue;}
    if(event.eventType==vr::VREvent_ScrollDiscrete&&!ui.selected.empty()&&ui.tab=="about"&&event.data.scroll.ydelta!=0){ui.aboutPage+=event.data.scroll.ydelta<0?1:-1;input.cancel();continue;}
    if(event.eventType==vr::VREvent_OverlayShown){action("catalog.discover","{}");continue;}

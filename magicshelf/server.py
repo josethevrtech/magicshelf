@@ -8,6 +8,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from .manager import Manager, atomic
+from .notifications import acknowledge
 
 def dispatch(manager, packet):
     if packet.get("api_version") not in (1, 2):
@@ -30,6 +31,7 @@ def dispatch(manager, packet):
         return result
     actions = {
         "snapshot": lambda: manager.snapshot(),
+        "notifications.ack": lambda: acknowledge(manager, p.get('id'), p.get('token'), p.get('action')),
         "modules.adopt": lambda: manager.adopt(),
         "modules.bootstrap": lambda: manager.bootstrap(),
         "framework.install": lambda: manager.framework.install(),
