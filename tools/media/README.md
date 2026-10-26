@@ -1,23 +1,24 @@
 # MagicShelf feature tour
 
-The 48-second 1080p/30 fps tour presents the native MagicShelf 0.3.6 development
-build. It uses actual native UI rendering with the creation metadata captured
-on October 21, 2026: Android Phone (Virtual) 0.2.5 and Smartphone Digivice 0.2.4.
-The Discover screenshot in the project README is a live Steam Frame capture.
-The other pages are offline renders of the same native UI.
+The 36-second 1080p/30 fps tour presents MagicShelf 0.3.21. It uses the actual
+native UI renderer and public creation metadata captured on October 26, 2026.
+Six still screenshot scenes show Discover, creation details, permission review,
+the update policy, shelf customization and artist credits. Short fades are the
+only visual effect. The tour does not change the headset or install creations.
 
-The install review and animated 32 MB download are illustrative scenes, labeled
-in the video. They are not a recording of network speed or a package-size claim.
+The permission review is an illustrative scene, labeled INSTALL PREVIEW.
+No simulated download progress or network-speed claims appear in the video.
 No headset input, subscriptions, creation state or user data changes are made by
 the media tools.
 
 ## Music and credits
 
-**Shelf Lights** is an original 100 BPM electronic instrumental composed and
+**Neon Shelf** is an original 100 BPM cyberpunk/reggaeton instrumental with a
+dembow rhythm, dark synth chords, plucks and bass. It is composed and
 synthesized by `build_tour.py` for this video. Pads, plucks, bass and percussion
 are generated from oscillators and seeded noise; there are no external samples
 or borrowed recordings. The source is covered by the repository's MIT license.
-The exported master measures -16.7 LUFS integrated and -2.4 dBFS true peak.
+Audio fades in and out and is peak limited before encoding.
 
 MagicShelf and the original phone model: josethevrtech. Smartphone Digivice's
 Courage model: [Jojogape](https://x.com/jojogape). Digital Partner game:
