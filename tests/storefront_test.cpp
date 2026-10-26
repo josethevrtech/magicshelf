@@ -71,4 +71,14 @@ input.down(ui,px(toggle),py(toggle),false);input.cancel();assert(!input.up(ui,px
 input.down(ui,px(toggle),py(toggle),false);assert(!input.up(ui,px(toggle),py(toggle),true));
 input.down(ui,px(nav),py(nav),true);assert(input.up(ui,px(nav),py(nav),true));
 input.down(ui,px(toggle),py(toggle),false);for(auto&b:ui.buttons)if(b.method=="module.toggle")b.params="changed";assert(!input.up(ui,px(toggle),py(toggle),false));
-json_object_put(state);std::cout<<"Storefront navigation, subscription requests and non-overlapping hit targets passed\n";}
+// Every About word remains reachable, and creation management has no device settings.
+std::string about;for(int i=0;i<180;i++)about+="word"+std::to_string(i)+" ";
+json_object_object_add(phone,"about",json_object_new_string(about.c_str()));ui.tab="about";ui.aboutPage=0;
+auto lines=ui.aboutLines(c,about);std::string reconstructed;for(auto line:lines)reconstructed+=line+" ";assert(reconstructed==about);
+int pages=(int(lines.size())+5)/6;assert(pages>1);
+for(int i=0;i<pages;i++){ui.aboutPage=i;check(ui,c,state);assert(ui.aboutPage==i);}
+ui.aboutPage=999;check(ui,c,state);assert(ui.aboutPage==pages-1);
+ui.local({0,0,0,0,"ui.about-prev","{}"},state,method,params);assert(ui.aboutPage==pages-2);
+ui.tab="settings";check(ui,c,state);for(auto b:ui.buttons)assert(b.method!="module.open");
+ui.local({0,0,0,0,"ui.detail",argsFor("org.test.phone")},state,method,params);assert(ui.aboutPage==0);
+json_object_put(state);std::cout<<"Storefront navigation, complete About pagination, management-only controls and non-overlapping hit targets passed\n";}

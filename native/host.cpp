@@ -27,12 +27,14 @@ void dashboard(){
  auto config=magicshelfEnv("MAGICSHELF_LAYOUT_DIR"),dir=magicshelfEnv("MAGICSHELF_RUNTIME_DIR");
  auto*applications=vr::VRApplications();
  if(applications->AddApplicationManifest((config+"/magicshelf.vrmanifest").c_str(),false))throw std::runtime_error("Cannot register MagicShelf with SteamVR");
- applications->SetApplicationAutoLaunch("com.josethevrtech.magicshelf",false);applications->IdentifyApplication(getpid(),"com.josethevrtech.magicshelf");
+ applications->SetApplicationAutoLaunch("com.josethevrtech.magicshelf",true);applications->IdentifyApplication(getpid(),"com.josethevrtech.magicshelf");
  auto*o=vr::VROverlay();
  DashboardTexture gpu(StoreUI::W*RenderScale,StoreUI::H*RenderScale);
  OverlayLifetime overlay{o};vr::VROverlayHandle_t thumb=0;
  if(o->CreateDashboardOverlay("com.josethevrtech.magicshelf","MagicShelf",&overlay.panel,&thumb))throw std::runtime_error("MagicShelf dashboard already exists");
  auto panel=overlay.panel;
+ o->SetOverlayFlag(panel,vr::VROverlayFlags_MinimalControlBar,true);
+ o->SetOverlayFlag(panel,vr::VROverlayFlags_EnableControlBarClose,true);
  o->SetOverlayFromFile(thumb,(std::filesystem::canonical("/proc/self/exe").parent_path().parent_path()/"icon.png").c_str());
  o->SetOverlayInputMethod(panel,vr::VROverlayInputMethod_Mouse);vr::HmdVector2_t mouse{{StoreUI::W,StoreUI::H}};
  o->SetOverlayMouseScale(panel,&mouse);o->SetOverlayWidthInMeters(panel,DashboardWidthMeters);
@@ -78,6 +80,7 @@ void dashboard(){
   vr::VREvent_t event;
   while(vr::VRSystem()->PollNextEvent(&event,sizeof(event)))if(event.eventType==vr::VREvent_Quit){vr::VRSystem()->AcknowledgeQuit_Exiting();running=false;}
   while(o->PollNextOverlayEvent(panel,&event,sizeof(event))){
+   if(event.eventType==vr::VREvent_OverlayClosed){o->HideOverlay(panel);input.cancel();continue;}
    if(event.eventType==vr::VREvent_OverlayShown){action("catalog.discover","{}");continue;}
    if(event.eventType==vr::VREvent_Quit){running=false;continue;}
    if(event.eventType==vr::VREvent_FocusLeave||event.eventType==vr::VREvent_OverlayHidden){input.cancel();continue;}
@@ -87,6 +90,7 @@ void dashboard(){
    float x=event.data.mouse.x,y=StoreUI::H-event.data.mouse.y;
    if(event.eventType==vr::VREvent_MouseButtonDown)input.down(ui,x,y,working);
    else if(auto hit=input.up(ui,x,y,working)){
+    if(hit->method=="ui.close"){o->HideOverlay(panel);input.cancel();continue;}
     std::string method,params;auto before=ui.key();if(ui.local(*hit,j,method,params))action(method,params);
     else if(hit->method=="ui.discover")action("catalog.discover","{}");
     if(ui.key()!=before)input.cancel();

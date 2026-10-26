@@ -92,12 +92,15 @@ struct Renderer{
  glGenBuffers(1,&vbo);glBindBuffer(GL_ARRAY_BUFFER,vbo);glBufferData(GL_ARRAY_BUFFER,v.size()*sizeof(Vertex),v.data(),GL_STATIC_DRAW);
  glGenTextures(1,&tex);glBindTexture(GL_TEXTURE_2D,tex);glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,W,H,0,GL_RGBA,GL_UNSIGNED_BYTE,nullptr);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
  glGenFramebuffers(1,&fbo);glBindFramebuffer(GL_FRAMEBUFFER,fbo);glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,tex,0);glGenRenderbuffers(1,&depth);glBindRenderbuffer(GL_RENDERBUFFER,depth);glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH_COMPONENT24,W,H);glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,depth);if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)throw std::runtime_error("FBO failed");
- glGenTextures(1,&lcd);glBindTexture(GL_TEXTURE_2D,lcd);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,AndroidOnly?GL_LINEAR:GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,AndroidOnly?GL_LINEAR:GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+ glGenTextures(1,&lcd);glBindTexture(GL_TEXTURE_2D,lcd);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,AndroidOnly?GL_LINEAR:GL_LINEAR_MIPMAP_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,AndroidOnly?GL_LINEAR:GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
  }
  void screenPixels(int w,int h,const unsigned char*p){
   glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,lcd);
   if(w!=lcdWidth||h!=lcdHeight){glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,w,h,0,GL_RGBA,GL_UNSIGNED_BYTE,p);lcdWidth=w;lcdHeight=h;}
   else glTexSubImage2D(GL_TEXTURE_2D,0,0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,p);
+  // Average subpixel game detail when viewed at a distance or angle. Keep
+  // nearest magnification so large pixel-art displays retain their hard edges.
+  if(!AndroidOnly)glGenerateMipmap(GL_TEXTURE_2D);
   // No swap/present happens while hidden or tracking is unavailable. Complete
   // uploads here so the driver cannot retain an unbounded queue of pixel data.
   glFinish();
