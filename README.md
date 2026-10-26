@@ -4,7 +4,7 @@ MagicShelf is a home for the random experiments I (@josethevrtech) work on. Subs
 
 Built for **SteamOS and Steam Frame ONLY**.
 
-[![Watch the MagicShelf feature tour](https://github.com/user-attachments/assets/a3043c97-b729-4f46-8c98-a9f49aa84bb7)](https://github.com/user-attachments/assets/b95519ce-6af4-4641-800a-8c65aad8a6dd)
+[![Watch the MagicShelf feature tour](https://github.com/josethevrtech/magicshelf/releases/download/v0.3.21/magicshelf-feature-tour-poster.png)](https://github.com/josethevrtech/magicshelf/releases/download/v0.3.21/magicshelf-feature-tour.mp4)
 
 | Discover | Creation details |
 | --- | --- |
