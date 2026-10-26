@@ -81,4 +81,14 @@ ui.aboutPage=999;check(ui,c,state);assert(ui.aboutPage==pages-1);
 ui.local({0,0,0,0,"ui.about-prev","{}"},state,method,params);assert(ui.aboutPage==pages-2);
 ui.tab="settings";check(ui,c,state);for(auto b:ui.buttons)assert(b.method!="module.open");
 ui.local({0,0,0,0,"ui.detail",argsFor("org.test.phone")},state,method,params);assert(ui.aboutPage==0);
-json_object_put(state);std::cout<<"Storefront navigation, complete About pagination, management-only controls and non-overlapping hit targets passed\n";}
+auto*notices=json_tokener_parse(R"([{"id":"org.test.download","name":"Test creation","version":"1.2.0","token":"1.2.0:abc","announced":false,"dismissed":false},{"id":"org.test.phone","name":"Phone","version":"2.0.0","token":"2:abc","announced":true,"dismissed":true},{"id":"org.test.third","name":"Third","version":"1.0.0","token":"1:abc"}])");
+json_object_object_add(state,"update_notices",notices);ui.selected.clear();ui.view="updates";ui.reviewId.clear();ui.noticePage=0;check(ui,c,state);
+bool later=false,updateNow=false;
+for(auto b:ui.buttons){
+ if(b.method=="notifications.ack"){auto*a=json_tokener_parse(b.params.c_str());assert(textfield(a,"action")=="later");assert(textfield(a,"token")=="1.2.0:abc");json_object_put(a);later=true;}
+ if(b.method=="ui.update"&&b.params==argsFor("org.test.download")){assert(!ui.local(b,state,method,params));assert(ui.reviewId=="org.test.download");updateNow=true;}
+}
+assert(later&&updateNow);check(ui,c,state);assert(ui.local({0,0,0,0,"ui.confirm","{}"},state,method,params));assert(method=="module.subscribe");
+ui.reviewId.clear();auto oldKey=ui.key();ui.local({0,0,0,0,"ui.notices-next","{}"},state,method,params);assert(ui.key()!=oldKey);check(ui,c,state);assert(ui.noticePage==1);
+json_object_object_del(state,"update_notices");check(ui,c,state);assert(ui.noticePage==0);
+json_object_put(state);std::cout<<"Storefront navigation, About pagination, update-notice controls/confirmation and non-overlapping hit targets passed\n";}

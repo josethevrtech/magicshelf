@@ -87,6 +87,18 @@ function detail(item){if(setupFocused(item))return setupPage(item);const section
   right.append(actions);
   right.append(el('p',item.adapter?'This creation is already installed on your device. Its downloadable release is still being prepared.':item.update_note?item.update_note:'Subscribe to download this creation and receive future updates.','explanation'));
   const tabs=el('div',null,'detail-tabs');tabs.setAttribute('role','tablist');['about','settings','credits'].forEach(t=>{const b=button(t==='settings'?'Manage':t[0].toUpperCase()+t.slice(1),'',()=>{tab=t;render();});b.setAttribute('role','tab');b.setAttribute('aria-selected',String(tab===t));tabs.append(b);});right.append(tabs);const content=el('div',null,'tab-content');content.setAttribute('role','tabpanel');if(tab==='settings')content.append(settings(item));else if(tab==='credits')content.append(credits(item));else{content.append(el('p',item.about||item.description,'about'));const links=el('div',null,'links');(item.links||[]).forEach(l=>links.append(link(l.label+' ↗',l.url)));content.append(links);}right.append(content);grid.append(left,right);section.append(grid);return section;}
+function updateNotices(){
+ const section=el('section');section.append(el('h1','Updates ready'),el('p','Keep playing. Running creations are never restarted automatically for an update.'));
+ for(const notice of snapshot.update_notices||[]){
+  const card=el('section',null,'settings-panel');card.append(el('h2',notice.name+' · '+notice.version),el('p',notice.message),el('p','Update now restarts this creation after you confirm. Saved data is kept.'));
+  if(!notice.dismissed)card.append(button('Later','secondary',()=>act('notifications.ack',{id:notice.id,token:notice.token,action:'later'})));
+  else card.append(el('p','Waiting until Off. No more reminders for this update.'));
+  const item=snapshot.modules.find(m=>m.id===notice.id);if(item)card.append(button('Update now','primary',()=>review(item)));
+  section.append(card);
+ }
+ if(!snapshot.update_notices?.length)section.append(el('p','No running creations have an update waiting.'));
+ return section;
+}
 function preferences(){
   const section=el('section',null,'store-settings'),intro=el('div',null,'intro');intro.append(el('h1','Settings'));section.append(intro);
   const prefs=snapshot.preferences;if(!prefs)return section;
@@ -112,10 +124,12 @@ function preferences(){
   const update=snapshot.framework_update;if(update){const panel=el('section',null,'settings-panel');panel.append(el('h2','MagicShelf '+snapshot.version),el('p',update.message));if(update.stage==='ready')panel.append(button('Update and reopen','primary',()=>act('framework.install')));else if(update.stage==='downloading')panel.append(progress({...update,name:'MagicShelf'}));else if(update.stage==='failed')panel.append(button('Try again','secondary',()=>act('catalog.refresh')));section.append(panel);}
   const credits=el('section',null,'settings-panel');credits.append(el('h2','Credits'),el('p','MagicShelf '+snapshot.version+' · SteamOS and Steam Frame'));
   for(const credit of prefs.credits){const row=el('div',null,'credit');row.append(el('h3',credit.name),el('p',credit.role),link('Open project ↗',credit.url));credits.append(row);}
+  credits.append(el('h3','Download statistics & privacy'),el('p','Download totals come from GitHub. Updates and repeat downloads count too. MagicShelf sends no playtime or device-usage analytics.'));
   credits.append(el('p',"Creation artists and contributors are credited on each creation's page."));section.append(credits);
   return section;
 }
-function render(){if(!snapshot)return;const item=snapshot.modules.find(m=>m.id===selected);if(selected&&!item)selected=null;$('discover').setAttribute('aria-pressed',String(view==='discover'));$('library').setAttribute('aria-pressed',String(view==='library'));$('preferences').setAttribute('aria-pressed',String(view==='settings'));$('shelf-count').textContent=snapshot.modules.filter(m=>m.installed).length;$('version').textContent='MagicShelf '+snapshot.version;document.body.classList.toggle('setup-active',Boolean(setupFocused(item)));$('breadcrumb').textContent=item&&!setupFocused(item)?'Collection / '+item.name:'';$('content').replaceChildren(item?detail(item):view==='settings'?preferences():collection());renderCards();$('notice').textContent=actionError||snapshot.message;$('notice').className=actionError?'error':'';$('update-status').textContent=snapshot.update_message||'';$('downloads').replaceChildren();if(snapshot.transfer&&snapshot.transfer.stage!=='complete'){$('downloads').append(el('small','DOWNLOADS'),el('p',snapshot.transfer.name),progress(snapshot.transfer));}$('refresh').disabled=working;}
+function render(){if(!snapshot)return;$('updates').hidden=!snapshot.update_notices?.length;$('updates').setAttribute('aria-pressed',String(view==='updates'));const item=snapshot.modules.find(m=>m.id===selected);if(selected&&!item)selected=null;$('discover').setAttribute('aria-pressed',String(view==='discover'));$('library').setAttribute('aria-pressed',String(view==='library'));$('preferences').setAttribute('aria-pressed',String(view==='settings'));$('shelf-count').textContent=snapshot.modules.filter(m=>m.installed).length;$('version').textContent='MagicShelf '+snapshot.version;document.body.classList.toggle('setup-active',Boolean(setupFocused(item)));$('breadcrumb').textContent=item&&!setupFocused(item)?'Collection / '+item.name:'';$('content').replaceChildren(item?detail(item):view==='settings'?preferences():view==='updates'?updateNotices():collection());renderCards();$('notice').textContent=actionError||snapshot.message;$('notice').className=actionError?'error':'';$('update-status').textContent=snapshot.update_message||'';$('downloads').replaceChildren();if(snapshot.transfer&&snapshot.transfer.stage!=='complete'){$('downloads').append(el('small','DOWNLOADS'),el('p',snapshot.transfer.name),progress(snapshot.transfer));}$('refresh').disabled=working;}
+$('updates').onclick=()=>choose('updates');
 $('brand').onclick=e=>{e.preventDefault();choose('discover');};$('discover').onclick=()=>choose('discover');$('library').onclick=()=>choose('library');$('preferences').onclick=()=>choose('settings');$('refresh').onclick=()=>act('catalog.refresh');
 api('snapshot').then(data=>{snapshot=data;view=data.preferences?.values?.start_view||'discover';render();api('catalog.discover').catch(()=>{});}).catch(e=>{$('notice').textContent=e.message;$('notice').className='error';});
 let lastPoll=0;

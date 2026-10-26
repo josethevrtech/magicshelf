@@ -15,6 +15,7 @@ from .contracts import ContractError, MAX_MODULES, catalog, load, machine, requi
 from .packages import download, unpack
 from .storefront import decorate
 from . import preferences, setup
+from .notifications import ready_notices
 from .framework_updates import FrameworkUpdates
 from .updates import Updates
 from .session import service_environment, user_runtime
@@ -96,6 +97,7 @@ class Manager(Updates):
         self.sessions = load(self.sessionpath) if self.sessionpath.exists() else {}
         self.ready = set()
         self.state.setdefault("subscriptions", {})
+        self.state.setdefault("update_notices", {})
         for field in ("pending_updates", "update_errors", "held_updates"):
             self.state.setdefault(field, {})
         self._sync_lock = threading.Lock()
@@ -688,7 +690,7 @@ class Manager(Updates):
                 item = next((m for m in modules if m['id'] == transfer.get('id')), None)
                 if item and item['setup'].get('stage') == 'failed':
                     transfer = {**transfer, 'stage': 'setup_failed'}
-        return {"api_version": 1, "version": VERSION, "modules": modules, "catalogs": self.state["catalogs"], "preferences": preferences.snapshot(load(self.layoutpath)), "transfer": transfer, "busy": self.busy, "message": self.message, "update_message": self.update_message, "checking_updates": self.checking, "last_update_check": self.state.get("last_update_check"), "catalog_errors": self.catalog_errors, "framework_update": self.framework.snapshot()}
+        return {"api_version": 1, "version": VERSION, "modules": modules, "update_notices": ready_notices(self.state, modules, self.download_path), "catalogs": self.state["catalogs"], "preferences": preferences.snapshot(load(self.layoutpath)), "transfer": transfer, "busy": self.busy, "message": self.message, "update_message": self.update_message, "checking_updates": self.checking, "last_update_check": self.state.get("last_update_check"), "catalog_errors": self.catalog_errors, "framework_update": self.framework.snapshot()}
 
     def publish(self):
         atomic(self.runtime / "ui-state.json", self.snapshot())

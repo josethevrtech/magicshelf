@@ -10,6 +10,7 @@
   "magicshelf/framework_updates.py",
   "magicshelf/framework_worker.py",
   "magicshelf/manager.py",
+  "magicshelf/notifications.py",
   "magicshelf/packages.py",
   "magicshelf/preferences.py",
   "magicshelf/server.py",

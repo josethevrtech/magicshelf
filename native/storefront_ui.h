@@ -9,11 +9,12 @@ inline json_object* field(json_object*j,const char*k){json_object*v=nullptr;if(j
 inline std::string textfield(json_object*j,const char*k){auto*v=field(j,k);return v?json_object_get_string(v):"";}
 inline bool boolfield(json_object*j,const char*k){return json_object_get_boolean(field(j,k));}
 inline std::string argsFor(const std::string&id,const char*key=nullptr,json_object*value=nullptr){auto*j=json_object_new_object();json_object_object_add(j,"id",json_object_new_string(id.c_str()));if(key)json_object_object_add(j,key,value);std::string s=json_object_to_json_string(j);json_object_put(j);return s;}
+inline std::string noticeArgs(json_object*n,const char*action){auto*j=json_object_new_object();json_object_object_add(j,"id",json_object_new_string(textfield(n,"id").c_str()));json_object_object_add(j,"token",json_object_new_string(textfield(n,"token").c_str()));json_object_object_add(j,"action",json_object_new_string(action));std::string out=json_object_to_json_string(j);json_object_put(j);return out;}
 struct StoreButton{int x,y,w,h;std::string method,params;bool hit(float a,float b)const{return a>=x&&a<x+w&&b>=y&&b<y+h;}};
 struct StoreUI{
  static constexpr int W=1280,H=900;
  std::string view="discover",selected,tab="about",settingsTab="shelf",reviewId,reviewMethod;
- int page=0,gallery=0,creditPage=0,linkPage=0,aboutPage=0;bool working=false;
+ int page=0,gallery=0,creditPage=0,linkPage=0,aboutPage=0,noticePage=0;bool working=false;
  std::vector<StoreButton> buttons;
  std::string hover,pressed;
  std::map<std::string,cairo_surface_t*> images;
@@ -34,7 +35,7 @@ struct StoreUI{
   cairo_save(c.c);ShelfTheme::source(c,ShelfTheme::accent,pressed==id?.19:.08);cairo_rectangle(c.c,x+2,y+2,w-4,h-4);cairo_fill(c.c);
   ShelfTheme::source(c,ShelfTheme::accent);cairo_set_line_width(c.c,pressed==id?3:2);cairo_rectangle(c.c,x+2,y+2,w-4,h-4);cairo_stroke(c.c);cairo_restore(c.c);
  }
- std::string key()const{return view+selected+tab+settingsTab+reviewId+reviewMethod+std::to_string(page)+":"+std::to_string(gallery)+":"+std::to_string(creditPage)+":"+std::to_string(linkPage)+":"+std::to_string(aboutPage);}
+ std::string key()const{return view+selected+tab+settingsTab+reviewId+reviewMethod+std::to_string(page)+":"+std::to_string(gallery)+":"+std::to_string(creditPage)+":"+std::to_string(linkPage)+":"+std::to_string(aboutPage)+":"+std::to_string(noticePage);}
  json_object* find(json_object*state,const std::string&id){auto*a=field(state,"modules");for(size_t i=0;a&&i<json_object_array_length(a);i++){auto*m=json_object_array_get_idx(a,i);if(textfield(m,"id")==id)return m;}return nullptr;}
  void round(Canvas&c,double x,double y,double w,double h,double r,ShelfTheme::Color color){cairo_new_sub_path(c.c);cairo_arc(c.c,x+w-r,y+r,r,-M_PI/2,0);cairo_arc(c.c,x+w-r,y+h-r,r,0,M_PI/2);cairo_arc(c.c,x+r,y+h-r,r,M_PI/2,M_PI);cairo_arc(c.c,x+r,y+r,r,M_PI,3*M_PI/2);cairo_close_path(c.c);ShelfTheme::source(c,color);cairo_fill(c.c);}
  void text(Canvas&c,int x,int y,const std::string&s,int size=20,bool muted=false,int width=1000){cairo_save(c.c);cairo_rectangle(c.c,x,y-size,width,size+9);cairo_clip(c.c);auto color=muted?ShelfTheme::muted:ShelfTheme::text;c.text(x,y,s,size,color.r,color.g,color.b);cairo_restore(c.c);}
@@ -76,6 +77,7 @@ struct StoreUI{
   button(c,20,141,180,"Discover","ui.discover","{}",view=="discover");
   button(c,20,199,180,"My Shelf","ui.library","{}",view=="library");
   button(c,20,257,180,"Settings","ui.preferences","{}",view=="settings");
+  if(auto*n=field(state,"update_notices");n&&json_object_array_length(n))button(c,20,375,182,"Updates ready","ui.updates","{}",view=="updates");
   if(textfield(field(state,"framework_update"),"stage")=="ready")button(c,20,475,182,"App update ready","ui.appupdates");
   if(auto*t=field(state,"transfer");t&&textfield(t,"stage")!="complete"&&!setupFocused(find(state,selected))){
    text(c,27,587,"DOWNLOADS",13,true,170);wrap(c,27,618,168,textfield(t,"name"),18,2,false);
@@ -94,7 +96,7 @@ struct StoreUI{
   if(m&&!setup)text(c,254,55,"Collection / "+textfield(m,"name"),17,true,670);
   button(c,1094,25,154,"Close panel","ui.close","{}",false,44);
   ShelfTheme::rect(c,254,94,994,1,ShelfTheme::border);
-  if(!reviewId.empty())review(c,state);else if(m)detail(c,m,state);else if(view=="settings")preferences(c,state);else collection(c,state);
+  if(!reviewId.empty())review(c,state);else if(m)detail(c,m,state);else if(view=="settings")preferences(c,state);else if(view=="updates")updateNotices(c,state);else collection(c,state);
   auto*t=field(state,"transfer");std::string status=boolfield(t,"active")?transferLabel(t)+" · "+textfield(t,"name"):busy?"Updating your shelf... You can keep browsing.":message;
   if(!setup||actionFailed){ShelfTheme::rect(c,254,848,994,1,ShelfTheme::border);text(c,254,869,actionFailed?message:status,14,true,994);if(!setup)text(c,254,891,textfield(state,"update_message"),12,true,994);}
  }
@@ -143,7 +145,9 @@ struct StoreUI{
     auto*arg=json_object_new_object();json_object_object_add(arg,"index",json_object_new_int(i));std::string params=json_object_to_json_string(arg);json_object_put(arg);
     button(c,1010,y,238,"Open project >","app.link",params);
    }
-   text(c,278,781,"Creation artists and contributors are credited on each creation's page.",18,true,950);return;
+   text(c,278,706,"Download statistics & privacy",22);
+   wrap(c,278,742,950,"Download totals come from GitHub. Updates and repeat downloads count too. MagicShelf sends no playtime or device-usage analytics.",18,3);
+   text(c,278,824,"Creation artists and contributors are credited on each creation's page.",16,true,950);return;
   }
   auto*controls=field(p,"controls");int row=0;
   for(size_t i=0;controls&&i<json_object_array_length(controls);i++){
@@ -173,6 +177,23 @@ struct StoreUI{
   }
   button(c,254,782,238,"Restore defaults","settings.reset",std::string("{\"group\":\"")+settingsTab+"\"}");
   text(c,518,812,settingsTab=="app"?"Changes save automatically.":"Layout changes return creations to the dock.",17,true,730);
+ }
+ void updateNotices(Canvas&c,json_object*state){
+  text(c,254,171,"Updates ready",38);
+  wrap(c,254,209,994,"Keep playing. Running creations are never restarted automatically for an update.",19,2);
+  auto*notices=field(state,"update_notices");int count=notices?json_object_array_length(notices):0;
+  noticePage=std::clamp(noticePage,0,std::max(0,(count-1)/2));
+  for(int i=noticePage*2;i<std::min(count,noticePage*2+2);i++){
+   auto*n=json_object_array_get_idx(notices,i);int y=265+(i%2)*235;
+   round(c,254,y,994,211,16,ShelfTheme::panel);
+   text(c,278,y+40,textfield(n,"name")+" · "+textfield(n,"version"),25,false,940);
+   wrap(c,278,y+78,925,"The update is downloaded. It installs automatically when you turn this creation Off. Update now restarts it after you confirm.",18,3);
+   if(!boolfield(n,"dismissed"))button(c,738,y+153,245,"Later","notifications.ack",noticeArgs(n,"later"),false,44);
+   else text(c,278,y+182,"Waiting until Off. No more reminders for this update.",16,true,700);
+   button(c,1003,y+153,245,"Update now","ui.update",argsFor(textfield(n,"id")),true,44);
+  }
+  if(!count)wrap(c,278,319,925,"No running creations have a downloaded update waiting. Your shelf stays up to date automatically.",22,3);
+  if(count>2){button(c,738,782,245,"< Previous","ui.notices-prev");button(c,1003,782,245,"Next >","ui.notices-next");}
  }
  void setupPage(Canvas&c,json_object*m){
   button(c,254,112,130,"< Back","ui.back");art(c,m,254,183,450,534);
@@ -249,6 +270,8 @@ struct StoreUI{
   else if(b.method.rfind("ui.pref.",0)==0)settingsTab=b.method.substr(8);
   else if(b.method=="ui.detail"){selected=id;auto*m=find(state,id);tab=boolfield(m,"installed")&&field(m,"setup")&&!boolfield(field(m,"setup"),"ready")?"settings":"about";gallery=0;creditPage=0;linkPage=0;aboutPage=0;}
   else if(b.method=="ui.about-next")aboutPage++;else if(b.method=="ui.about-prev")aboutPage--;
+  else if(b.method=="ui.updates"){view="updates";selected.clear();reviewId.clear();noticePage=0;}
+  else if(b.method=="ui.notices-next")noticePage++;else if(b.method=="ui.notices-prev")noticePage--;
   else if(b.method=="ui.back")selected.clear();else if(b.method=="ui.settings")tab="settings";
   else if(b.method=="ui.setup"){selected=id;tab="settings";reviewId.clear();}
   else if(b.method=="ui.appupdates"){selected.clear();reviewId.clear();view="settings";settingsTab="app";}
