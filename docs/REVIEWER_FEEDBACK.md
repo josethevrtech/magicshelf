@@ -1,4 +1,4 @@
-# Reviewer follow-up (0.3.19)
+# Reviewer follow-up (0.3.20)
 
 MagicShelf manages creation installation, On/Off, subscriptions, updates,
 rollback and removal. Creation-specific settings belong to each creation.

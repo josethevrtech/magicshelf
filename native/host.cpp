@@ -35,6 +35,7 @@ void dashboard(){
  auto panel=overlay.panel;
  o->SetOverlayFlag(panel,vr::VROverlayFlags_MinimalControlBar,true);
  o->SetOverlayFlag(panel,vr::VROverlayFlags_EnableControlBarClose,true);
+ o->SetOverlayFlag(panel,vr::VROverlayFlags_SendVRDiscreteScrollEvents,true);
  o->SetOverlayFromFile(thumb,(std::filesystem::canonical("/proc/self/exe").parent_path().parent_path()/"icon.png").c_str());
  o->SetOverlayInputMethod(panel,vr::VROverlayInputMethod_Mouse);vr::HmdVector2_t mouse{{StoreUI::W,StoreUI::H}};
  o->SetOverlayMouseScale(panel,&mouse);o->SetOverlayWidthInMeters(panel,DashboardWidthMeters);
@@ -81,6 +82,7 @@ void dashboard(){
   while(vr::VRSystem()->PollNextEvent(&event,sizeof(event)))if(event.eventType==vr::VREvent_Quit){vr::VRSystem()->AcknowledgeQuit_Exiting();running=false;}
   while(o->PollNextOverlayEvent(panel,&event,sizeof(event))){
    if(event.eventType==vr::VREvent_OverlayClosed){o->HideOverlay(panel);input.cancel();continue;}
+   if(event.eventType==vr::VREvent_ScrollDiscrete&&!ui.selected.empty()&&ui.tab=="about"&&event.data.scroll.ydelta!=0){ui.aboutPage+=event.data.scroll.ydelta<0?1:-1;input.cancel();continue;}
    if(event.eventType==vr::VREvent_OverlayShown){action("catalog.discover","{}");continue;}
    if(event.eventType==vr::VREvent_Quit){running=false;continue;}
    if(event.eventType==vr::VREvent_FocusLeave||event.eventType==vr::VREvent_OverlayHidden){input.cancel();continue;}
