@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Compose a native UI feature tour and an original, deterministic synth score.
-Requires Python, numpy, pycairo and ffmpeg. Does not control the live app.
+Requires Python, numpy, Pillow and ffmpeg. Does not control the live app.
 """
 import argparse, math, pathlib, subprocess, wave
-import cairo
 import numpy as np
 
 W,H,FPS,SECONDS=1920,1080,30,48
@@ -73,40 +72,32 @@ SCENES=[
 def main():
     p=argparse.ArgumentParser();p.add_argument('screens',type=pathlib.Path);p.add_argument('output',type=pathlib.Path);a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
     score(a.output/'neon-shelf.wav')
-    cache={};surface=cairo.ImageSurface(cairo.FORMAT_ARGB32,W,H);c=cairo.Context(surface)
-    def text(x,y,label,size=24,color=WHITE,bold=False):
-        c.set_source_rgb(*color);c.select_font_face('DejaVu Sans',cairo.FONT_SLANT_NORMAL,cairo.FONT_WEIGHT_BOLD if bold else cairo.FONT_WEIGHT_NORMAL);c.set_font_size(size)
-        for line in label.split('\n'):c.move_to(x,y);c.show_text(line);y+=size*1.23
-    def rounded(x,y,w,h,r):
-        c.new_sub_path()
-        for cx,cy,start in [(x+w-r,y+r,-math.pi/2),(x+w-r,y+h-r,0),(x+r,y+h-r,math.pi/2),(x+r,y+r,math.pi)]:c.arc(cx,cy,r,start,start+math.pi/2)
-        c.close_path()
-    def picture(name,x,y,w,h,alpha=1):
-        if name not in cache:cache[name]=cairo.ImageSurface.create_from_png(str(a.screens/(name+'.png')))
-        pic=cache[name];c.save();c.translate(x,y);c.scale(w/pic.get_width(),h/pic.get_height());c.set_source_surface(pic);c.paint_with_alpha(alpha);c.restore()
+    from PIL import Image,ImageDraw,ImageFont
     def scene(index,t):
         start,end,name,title,body,kicker=SCENES[index]
-        c.set_source_rgb(.018,.022,.042);c.paint()
-        c.set_source_rgb(.25,.85,.95);c.rectangle(64,66,72,5);c.fill()
-        text(64,119,'MAGICSHELF',25,WHITE,True)
-        text(64,270,kicker,18,BLUE,True)
-        text(64,350,title,40 if name=='artist-credits' else 48,WHITE,True)
-        text(64,535,body,24,MUTED)
-        picture(name,590,120,1260,886)
-        if name=='permissions-example':text(64,690,'INSTALL PREVIEW',16,BLUE)
-        text(64,950,'SteamOS + Steam Frame',22,MUTED)
-        text(64,1036,'github.com/josethevrtech/magicshelf',24,BLUE,True)
-        # One short dissolve at each cut. Screenshots stay still and readable.
-        opacity=max(0,1-(t-start)/.18 if start else 0,1-(end-t)/.18)
-        if opacity>0:c.set_source_rgba(.018,.022,.042,min(opacity,1));c.paint()
+        frame=Image.new('RGB',(W,H),(5,6,11));draw=ImageDraw.Draw(frame)
+        def label(x,y,value,size,color=WHITE,bold=False):
+            font=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans'+('-Bold' if bold else '')+'.ttf',size)
+            draw.multiline_text((x,y),value,font=font,fill=tuple(int(v*255) for v in color),spacing=int(size*.23),anchor='la')
+        draw.rectangle((64,66,136,71),fill=(64,217,242))
+        label(64,94,'MAGICSHELF',25,WHITE,True)
+        label(64,252,kicker,18,BLUE,True)
+        label(64,307,title,40 if name=='artist-credits' else 48,WHITE,True)
+        label(64,510,body,24,MUTED)
+        picture=Image.open(a.screens/(name+'.png')).convert('RGB').resize((1260,886),Image.Resampling.LANCZOS)
+        frame.paste(picture,(590,120))
+        if name=='permissions-example':label(64,674,'INSTALL PREVIEW',16,BLUE)
+        label(64,928,'SteamOS + Steam Frame',22,MUTED)
+        label(64,1012,'github.com/josethevrtech/magicshelf',24,BLUE,True)
+        return frame
     output=a.output/'magicshelf-feature-tour.mp4'
     slides=[]
     for index,(start,end,*_) in enumerate(SCENES):
-        scene(index,(start+end)/2)
+        frame=scene(index,(start+end)/2)
         path=a.output/f'slide-{index+1}.png'
-        surface.write_to_png(str(path))
+        frame.save(path)
         slides.append("file '"+path.resolve().as_posix()+"'\nduration "+str(end-start)+"\n")
-        if index==0:surface.write_to_png(str(a.output/'poster.png'))
+        if index==0:frame.save(a.output/'poster.png')
     slides.append("file '"+path.resolve().as_posix()+"'\n")
     playlist=a.output/'slides.txt';playlist.write_text(''.join(slides))
     subprocess.run(['ffmpeg','-hide_banner','-loglevel','warning','-y','-f','concat','-safe','0','-i',str(playlist),'-i',str(a.output/'neon-shelf.wav'),'-vf',f'fps={FPS},fade=t=in:st=0:d=0.18,fade=t=out:st={SECONDS-.3}:d=0.3','-c:v','libx264','-preset','fast','-crf','21','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart','-t',str(SECONDS),str(output)],check=True)

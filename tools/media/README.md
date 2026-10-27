@@ -41,7 +41,7 @@ c++ -std=c++17 -O2 -Inative tools/media/render_storefront.cpp \
   $(pkg-config --cflags --libs egl glesv2 cairo json-c)
 work/feature-tour/render-storefront /path/to/ui-state.json work/feature-tour/screens
 python3 -m venv --system-site-packages work/feature-tour/venv
-work/feature-tour/venv/bin/pip install numpy pycairo
+work/feature-tour/venv/bin/pip install numpy Pillow
 work/feature-tour/venv/bin/python tools/media/build_tour.py \
   work/feature-tour/screens outputs/feature-tour
 ```
