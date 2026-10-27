@@ -6,7 +6,7 @@ import argparse, math, pathlib, subprocess, wave
 import cairo
 import numpy as np
 
-W,H,FPS,SECONDS=1920,1080,30,36
+W,H,FPS,SECONDS=1920,1080,30,48
 BLUE=(.35,.65,1.0); WHITE=(.95,.97,1.0); MUTED=(.57,.66,.77)
 
 def score(path):
@@ -31,7 +31,7 @@ def score(path):
         return (signal*env).astype(np.float32)
     chords=[([52,55,59],40),([48,52,55],36),([57,60,64],45),([50,54,57],38)]
     melody=[[76,79,83,78,74,79,78,71],[76,79,83,86,83,79,74,76],[79,83,86,81,78,83,81,79],[78,81,86,88,86,81,78,74]]
-    for bar in range(15):
+    for bar in range(20):
         start=bar*4*beat;notes,root=chords[bar%4]
         for i,note in enumerate(notes):add(start,tone(note,2.8,'pad'),.052,(-.6+i*.3))
         for b in (0,1.5,2,3.5):add(start+b*beat,tone(root+(12 if b==3.5 else 0),.42,'bass'),.19)
@@ -40,7 +40,7 @@ def score(path):
             n=melody[bar%4][j];s=tone(n,.7,'pluck');at=start+j*.5*beat
             add(at,s,.080 if bar>=2 else .045,(-.38 if j%2 else .38))
             add(at+beat*.75,s,.021,(-.65 if j%2 else .65))
-        if bar<2 or bar>=14:continue
+        if bar<2 or bar>=19:continue
         for b in (0,2):
             t=np.arange(int(sr*.4))/sr;phase=2*np.pi*(46*t+100*.025*(1-np.exp(-t/.025)))
             kick=np.sin(phase)*np.exp(-t*12)+rng.normal(0,.1,len(t))*np.exp(-t*120)
@@ -62,12 +62,12 @@ def score(path):
         f.setnchannels(2);f.setsampwidth(2);f.setframerate(sr);f.writeframes((mix*32767).astype('<i2').tobytes())
 
 SCENES=[
- (0,6,'collection','Your creations.\nOne shelf.','Browse the collection on Steam Frame.','MAGICSHELF'),
+ (0,6,'collection','Browse creations\nby josethevrtech','','MAGICSHELF'),
  (6,12,'android-phone','Explore before\nyou subscribe.','Screenshots, permissions and project links.','DISCOVER'),
  (12,18,'permissions-example','Choose what\nyou install.','Review permissions before subscribing.','INSTALL'),
  (18,24,'collection','Updates without\ninterruptions.','Keep playing. Updates install when Off.\nUpdate now asks before restarting.','STAY CURRENT'),
  (24,30,'shelf-settings','Make room\nfor your shelf.','Adjust size, spacing and placement.','CUSTOMIZE'),
- (30,36,'artist-credits','Made by people.\nBuilt for VR.','Credits and links inside every creation.','MAGICSHELF'),
+ (30,48,'artist-credits','Made by people.\nBuilt for VR.','Credits and links inside every creation.','MAGICSHELF'),
 ]
 
 def main():
@@ -90,7 +90,7 @@ def main():
         c.set_source_rgb(.25,.85,.95);c.rectangle(64,66,72,5);c.fill()
         text(64,119,'MAGICSHELF',25,WHITE,True)
         text(64,270,kicker,18,BLUE,True)
-        text(64,350,title,48,WHITE,True)
+        text(64,350,title,40 if name=='artist-credits' else 48,WHITE,True)
         text(64,535,body,24,MUTED)
         picture(name,590,120,1260,886)
         if name=='permissions-example':text(64,690,'INSTALL PREVIEW',16,BLUE)
@@ -104,7 +104,7 @@ def main():
     proc=subprocess.Popen(cmd,stdin=subprocess.PIPE)
     for frame in range(FPS*SECONDS):
         t=frame/FPS;index=next(i for i,s in enumerate(SCENES) if s[0]<=t<s[1]);scene(index,t);surface.flush();proc.stdin.write(surface.get_data())
-        if frame in (90,270,450,630,810,990):surface.write_to_png(str(a.output/f'frame-{frame:04d}.png'))
+        if frame in (90,270,450,630,810,1170):surface.write_to_png(str(a.output/f'frame-{frame:04d}.png'))
         if frame==90:surface.write_to_png(str(a.output/'poster.png'))
     proc.stdin.close()
     if proc.wait():raise RuntimeError('ffmpeg encoding failed')
