@@ -3,6 +3,7 @@
   "catalogs": [
     "https://github.com/josethevrtech/magicshelf-android-phone/releases/latest/download/catalog.json",
     "https://github.com/josethevrtech/magicshelf-digivice/releases/latest/download/catalog.json",
-    "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/latest/download/catalog.json"
+    "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/latest/download/catalog.json",
+    "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/latest/download/catalog.json"
   ]
 }
