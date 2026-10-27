@@ -50,3 +50,12 @@ FFmpeg with libx264/AAC and DejaVu Sans must be installed. Outputs include an
 H.264/AAC MP4 with fast-start metadata, a stereo WAV master, a poster and sample
 frames for review. Large video/audio files stay out of Git; the README links to
 GitHub-hosted attachments. The generated soundtrack is deterministic.
+
+## Publish for inline playback
+
+Upload the MP4 as a GitHub Markdown attachment, for example with
+`gh pr comment <PR> --attach outputs/feature-tour/magicshelf-feature-tour.mp4`.
+Use the resulting `https://github.com/user-attachments/assets/...` URL alone on
+its own line in the README. GitHub renders that attachment as a video player.
+A release-download URL or a thumbnail linked to an MP4 triggers a download
+instead. Keep the H.264/AAC fast-start export under GitHub's attachment limit.
