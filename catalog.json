@@ -224,7 +224,7 @@
       "schema_version": 1,
       "api_version": 2,
       "id": "sonic-tiger",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "name": "Sonic Tiger LCD",
       "description": "Play Sonic the Hedgehog 2 from PEXY inside a 3D Tiger handheld on Steam Frame. Internet required. No ROM import.",
       "author": "josethevrtech",
@@ -244,18 +244,18 @@
       "tagline": "Pick it up. Play Sonic.",
       "minimum_framework_version": "0.3.21",
       "startup_timeout_sec": 30,
-      "about": "SONIC ON YOUR SHELF\nPlay Sonic the Hedgehog 2 through PEXY's online player. Pick up the handheld, place it nearby, or return it to your MagicShelf.\n\nSTART PLAYING\nAn internet connection is needed to load the player. Wait for the game screen, then press X or point at ON/START and pull the trigger. No ROM import is needed.\n\nCONTROLS\nDirections: move and jump. A: Action. B: Pause. X: ON/START. Y: Settings. Point at the model buttons with your free hand and hold the trigger to hold a key. The two ATTACK halves and ACTION activate the same Action input. ACL resets the game.\n\nPICK UP AND PLACE\nHold grip to pick up; release to place. The holding stick adjusts distance. Home or a deliberate shake returns it to the shelf.\n\nSOUND AND CONNECTION\nY opens sound, volume and Reload Online Player. The handheld plays its own sound cues, not a continuous soundtrack. If loading fails, use Retry. PEXY availability and loading times can vary.\n\nPLEASE KNOW\nThe model and online game are Sonic 2. Settings are saved. Progress saves locally on Off and reload; compatibility depends on the hosted player version. This is a free fan-made integration, not an official Sega, Tiger Electronics or PEXY product.",
+      "about": "SONIC ON YOUR SHELF\nPlay Sonic the Hedgehog 2 through PEXY's online player. Pick up the handheld, place it nearby, or return it to your MagicShelf.\n\nSTART PLAYING\nAn internet connection is needed to load the player. Wait for the game screen, then press X or point at ON/START and pull the trigger. No ROM import is needed.\n\nCONTROLS\nDirections: move and jump. A: Action. B: Pause. X: ON/START. Y: Settings. Point at the model buttons with your free hand and hold the trigger to hold a key. The two ATTACK halves and ACTION activate the same Action input. ACL resets the game.\n\nPICK UP AND PLACE\nThe handheld fits its shelf slot automatically. Hold grip to pick up at your chosen size; release to place. The holding stick adjusts distance. Home or a deliberate shake returns it to the shelf.\n\nSOUND AND CONNECTION\nY opens sound, volume and Reload Online Player. The handheld plays its own sound cues, not a continuous soundtrack. If loading fails, use Retry. PEXY availability and loading times can vary.\n\nPLEASE KNOW\nThe model and online game are Sonic 2. Settings are saved. Progress saves locally on Off and reload; compatibility depends on the hosted player version. This is a free fan-made integration, not an official Sega, Tiger Electronics or PEXY product.",
       "screenshots": [
         {
-          "url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/download/v0.3.0/sonic-tiger-gameplay.png",
+          "url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/download/v0.3.1/sonic-tiger-gameplay.png",
           "caption": "Live Sonic 2 gameplay and original screen background inside Mattyew's Sonic 2 handheld model."
         },
         {
-          "url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/download/v0.3.0/sonic-tiger-settings.png",
+          "url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/download/v0.3.1/sonic-tiger-settings.png",
           "caption": "The creation's sound, volume and online-player settings."
         },
         {
-          "url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/download/v0.3.0/sonic-tiger-back.png",
+          "url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/download/v0.3.1/sonic-tiger-back.png",
           "caption": "Back and side of Mattyew's handheld model."
         }
       ],
@@ -333,9 +333,9 @@
           "license": "GPL-3.0-or-later system code; BSD-3-Clause CPU source. See THIRD_PARTY_NOTICES.md."
         }
       ],
-      "url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/download/v0.3.0/sonic-tiger-0.3.0-linux-aarch64.magicshelf",
-      "sha256": "1ff1dc9886ecb94228aa646b4c2048961f5749144fc7d1dec56612a36be6b6db",
-      "size_bytes": 2905965,
+      "url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/download/v0.3.1/sonic-tiger-0.3.1-linux-aarch64.magicshelf",
+      "sha256": "3c9d947cb353779cb9e46340aaec7d563c5d4aa7afe5877a35f4b122a08bc2fd",
+      "size_bytes": 2906474,
       "collection_url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/latest/download/catalog.json"
     }
   ]
