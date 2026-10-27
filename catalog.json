@@ -110,15 +110,15 @@
       ],
       "category": "Companions",
       "tagline": "A digital companion, now in your world.",
-      "about": "Smartphone Digivice brings Digital Partner into VR inside Jojogape\u2019s Courage smartphone model. Pick it up, care for your pet, and place it anywhere in your space. The on-device settings control size, brightness and placement; name fields open the headset keyboard. Off stops the game and its audio. Saved pets and settings stay in the same private data directory across updates.",
+      "about": "Smartphone Digivice brings Digital Partner into VR inside Jojogape’s Courage smartphone model. Pick it up, care for your pet, and place it anywhere in your space. The on-device settings control size, brightness and placement; name fields open the headset keyboard. Off stops the game and its audio. Saved pets and settings stay in the same private data directory across updates.",
       "screenshots": [
         {
           "url": "https://raw.githubusercontent.com/josethevrtech/magicshelf-smartphone-digivice/v0.2.8/media/smartphone-digivice.png",
-          "caption": "Digital Partner running inside Smartphone Digivice, using Jojogape\u2019s Courage model."
+          "caption": "Digital Partner running inside Smartphone Digivice, using Jojogape’s Courage model."
         },
         {
           "url": "https://raw.githubusercontent.com/josethevrtech/magicshelf-smartphone-digivice/v0.2.8/media/smartphone-digivice-back.png",
-          "caption": "Smartphone Digivice\u2019s Courage case and crest, viewed from the back."
+          "caption": "Smartphone Digivice’s Courage case and crest, viewed from the back."
         }
       ],
       "credits": [
@@ -212,13 +212,141 @@
       "screenshots": [
         {
           "url": "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/download/v0.3.13/pocket-pikachu.png",
-          "caption": "Pocket Pikachu\u2019s live pixel display inside Wikiti\u2019s yellow handheld model."
+          "caption": "Pocket Pikachu’s live pixel display inside Wikiti’s yellow handheld model."
         }
       ],
       "url": "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/download/v0.3.13/org.magicshelf.pocket-pikachu-0.3.13-linux-aarch64.magicshelf",
       "sha256": "83b5341bf174baf2cda371cfc6d71fa8e20634abcdecac2ce97281785a3cc645",
       "size_bytes": 2633416,
       "collection_url": "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/latest/download/catalog.json"
+    },
+    {
+      "schema_version": 1,
+      "api_version": 2,
+      "id": "sonic-tiger",
+      "version": "0.2.3",
+      "name": "Sonic Tiger LCD",
+      "description": "Play Sonic the Hedgehog from Internet Archive inside a 3D Tiger handheld on Steam Frame. Internet required. No ROM import.",
+      "author": "josethevrtech",
+      "license": "GPL-3.0-or-later; model CC-BY-4.0",
+      "platform": "linux",
+      "architecture": "aarch64",
+      "entrypoint": "bin/creation",
+      "permissions": [
+        "vr-overlay",
+        "network",
+        "external-runtime"
+      ],
+      "memory_mb": 2048,
+      "control_entrypoint": "bin/control",
+      "price": 0,
+      "category": "Games",
+      "tagline": "Pick it up. Play Sonic.",
+      "minimum_framework_version": "0.3.21",
+      "startup_timeout_sec": 30,
+      "about": "SONIC ON YOUR SHELF\nPlay the original Sonic the Hedgehog LCD game through Internet Archive's online player. Pick up the handheld, place it nearby, or return it to your MagicShelf.\n\nSTART PLAYING\nAn internet connection is needed to load the player. Wait for the game screen, then press X or point at ON/START and pull the trigger. No ROM import is needed.\n\nCONTROLS\nDirections: move and jump. A: Spin. B: Pause. X: ON/START. Y: Settings. Point at the model buttons with your free hand and hold the trigger to hold a key. The two ATTACK halves activate Spin; ACTION jumps. ACL resets the game.\n\nPICK UP AND PLACE\nHold grip to pick up; release to place. The holding stick adjusts distance. Home or a deliberate shake returns it to the shelf.\n\nSOUND AND CONNECTION\nY opens sound, volume and Reload Online Player. The handheld plays its own sound cues, not a continuous soundtrack. If loading fails, use Retry. Archive.org availability and loading times can vary.\n\nPLEASE KNOW\nThe model is Mattyew's Sonic 2 casing; the online game is Sonic 1. Settings are saved. The online game restarts when turned Off or reloaded. This is a free fan-made integration, not an official Sega, Tiger Electronics or Internet Archive product.",
+      "screenshots": [
+        {
+          "url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/download/v0.2.3/sonic-tiger-gameplay.png",
+          "caption": "Live Sonic 1 gameplay and original screen background inside Mattyew's Sonic 2 handheld model."
+        },
+        {
+          "url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/download/v0.2.3/sonic-tiger-settings.png",
+          "caption": "The creation's sound, volume and online-player settings."
+        },
+        {
+          "url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/download/v0.2.3/sonic-tiger-back.png",
+          "caption": "Back and side of Mattyew's handheld model."
+        }
+      ],
+      "links": [
+        {
+          "label": "Sonic Tiger LCD source",
+          "url": "https://github.com/josethevrtech/magicshelf-sonic-tiger"
+        },
+        {
+          "label": "Report an issue",
+          "url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/issues"
+        },
+        {
+          "label": "Play the original Archive.org item",
+          "url": "https://archive.org/details/hh_tsonic"
+        },
+        {
+          "label": "Mattyew's handheld model",
+          "url": "https://sketchfab.com/3d-models/tiger-handheld-games-console-20d9825be3b64e89b275ee062455691c"
+        },
+        {
+          "label": "Model license: CC BY 4.0",
+          "url": "https://creativecommons.org/licenses/by/4.0/"
+        },
+        {
+          "label": "Emularity source",
+          "url": "https://github.com/db48x/emularity"
+        },
+        {
+          "label": "MAME source",
+          "url": "https://github.com/mamedev/mame"
+        },
+        {
+          "label": "MagicShelf framework",
+          "url": "https://github.com/josethevrtech/magicshelf"
+        }
+      ],
+      "credits": [
+        {
+          "name": "Mattyew",
+          "role": "Tiger Handheld Games Console 3D model; converted, scaled and fitted with a live screen.",
+          "url": "https://sketchfab.com/3d-models/tiger-handheld-games-console-20d9825be3b64e89b275ee062455691c",
+          "license": "CC BY 4.0. https://creativecommons.org/licenses/by/4.0/ Artist: https://sketchfab.com/mattyu"
+        },
+        {
+          "name": "Internet Archive",
+          "role": "Hosts the online Sonic handheld player and its original screen artwork.",
+          "url": "https://archive.org/details/hh_tsonic",
+          "license": "Hosted content retains its original rights; no game files are bundled."
+        },
+        {
+          "name": "Daniel Brooks and Emularity contributors",
+          "role": "Browser emulator loader used by Internet Archive.",
+          "url": "https://github.com/db48x/emularity",
+          "license": "GPL-3.0; hosted by Archive.org, not bundled."
+        },
+        {
+          "name": "MAMEDev and contributors",
+          "role": "MAME emulation used by the hosted player.",
+          "url": "https://www.mamedev.org/",
+          "license": "GPL-2.0-or-later; individual source files may use other licenses."
+        },
+        {
+          "name": "Sega / Tiger Electronics",
+          "role": "Original Sonic the Hedgehog characters and handheld game.",
+          "url": "https://archive.org/details/hh_tsonic",
+          "license": "Original game, characters, artwork and trademarks retain their respective rights; not relicensed."
+        },
+        {
+          "name": "Qt Project and Chromium contributors",
+          "role": "System browser runtime and application libraries.",
+          "url": "https://doc.qt.io/qt-6.10/qtwebengine-licensing.html",
+          "license": "Qt open-source and Chromium third-party licenses. System libraries are dynamically linked."
+        },
+        {
+          "name": "Valve",
+          "role": "OpenVR integration.",
+          "url": "https://github.com/ValveSoftware/openvr",
+          "license": "BSD-3-Clause; see OPENVR-LICENSE.txt."
+        },
+        {
+          "name": "bzhxx / hap",
+          "role": "Retained native SM511 development reference; not the online backend.",
+          "url": "https://github.com/bzhxx/LCD-Game-Emulator",
+          "license": "GPL-3.0-or-later system code; BSD-3-Clause CPU source. See THIRD_PARTY_NOTICES.md."
+        }
+      ],
+      "url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/download/v0.2.3/sonic-tiger-0.2.3-linux-aarch64.magicshelf",
+      "sha256": "a77244da9ca235a43d5a0eca0133527a6666e69989f0d6dbe81264787421cd09",
+      "size_bytes": 2917719,
+      "collection_url": "https://github.com/josethevrtech/magicshelf-sonic-tiger/releases/latest/download/catalog.json"
     }
   ]
 }
