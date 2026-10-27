@@ -1,5 +1,15 @@
 # MagicShelf feature tour
 
+## Published final video
+
+The current README player uses Jose's supplied final edit, uploaded on October 26,
+2026: a 24.021-second 1080p H.264/AAC MP4 with replacement music. It was uploaded
+unchanged. The generation instructions and original-score credits below describe
+the earlier 48-second source edit, not the soundtrack of the published final edit.
+The replacement music was supplied by Jose; no source or license is asserted here.
+
+## Source edit
+
 The 48-second 1080p/30 fps tour presents MagicShelf 0.3.21. It uses the actual
 native UI renderer and public creation metadata captured on October 26, 2026.
 Six still screenshot scenes show Discover, creation details, permission review,
