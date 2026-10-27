@@ -73,15 +73,18 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('screens',type=pathlib.Path);p.add_argument('output',type=pathlib.Path);a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
     score(a.output/'neon-shelf.wav')
     from PIL import Image,ImageDraw,ImageFont
+    # Reuse the real native header: the shelf/M mark and mixed-case wordmark.
+    # Its source coordinates follow StoreUI::draw at the 2x capture scale.
+    header=Image.open(a.screens/'collection.png').convert('RGB').crop((20,36,442,148))
+    header=header.resize((295,78),Image.Resampling.LANCZOS)
     def scene(index,t):
         start,end,name,title,body,kicker=SCENES[index]
-        frame=Image.new('RGB',(W,H),(5,6,11));draw=ImageDraw.Draw(frame)
+        frame=Image.new('RGB',(W,H),(0,0,0));draw=ImageDraw.Draw(frame)
         def label(x,y,value,size,color=WHITE,bold=False):
             font=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans'+('-Bold' if bold else '')+'.ttf',size)
             draw.multiline_text((x,y),value,font=font,fill=tuple(int(v*255) for v in color),spacing=int(size*.23),anchor='la')
-        draw.rectangle((64,66,136,71),fill=(64,217,242))
-        label(64,94,'MAGICSHELF',25,WHITE,True)
-        label(64,252,kicker,18,BLUE,True)
+        frame.paste(header,(64,60))
+        if kicker!='MAGICSHELF':label(64,252,kicker,18,BLUE,True)
         label(64,307,title,40 if name=='artist-credits' else 48,WHITE,True)
         label(64,510,body,24,MUTED)
         picture=Image.open(a.screens/(name+'.png')).convert('RGB').resize((1260,886),Image.Resampling.LANCZOS)

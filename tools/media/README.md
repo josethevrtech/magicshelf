@@ -6,6 +6,8 @@ Six still screenshot scenes show Discover, creation details, permission review,
 the update policy, shelf customization and artist credits. Short opening and closing fades are the
 only visual effect. The closing credits scene lasts 18 seconds so its longer text
 can be read comfortably. The tour does not change the headset or install creations.
+The video header reuses the actual native screenshot's shelf/M logo and
+mixed-case MagicShelf wordmark, on the same black background as the app.
 
 The permission review is an illustrative scene, labeled INSTALL PREVIEW.
 No simulated download progress or network-speed claims appear in the video.
