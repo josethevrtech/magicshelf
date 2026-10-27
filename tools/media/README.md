@@ -1,10 +1,11 @@
 # MagicShelf feature tour
 
-The 36-second 1080p/30 fps tour presents MagicShelf 0.3.21. It uses the actual
+The 48-second 1080p/30 fps tour presents MagicShelf 0.3.21. It uses the actual
 native UI renderer and public creation metadata captured on October 26, 2026.
 Six still screenshot scenes show Discover, creation details, permission review,
-the update policy, shelf customization and artist credits. Short fades are the
-only visual effect. The tour does not change the headset or install creations.
+the update policy, shelf customization and artist credits. Short opening and closing fades are the
+only visual effect. The closing credits scene lasts 18 seconds so its longer text
+can be read comfortably. The tour does not change the headset or install creations.
 
 The permission review is an illustrative scene, labeled INSTALL PREVIEW.
 No simulated download progress or network-speed claims appear in the video.
@@ -40,7 +41,7 @@ c++ -std=c++17 -O2 -Inative tools/media/render_storefront.cpp \
   $(pkg-config --cflags --libs egl glesv2 cairo json-c)
 work/feature-tour/render-storefront /path/to/ui-state.json work/feature-tour/screens
 python3 -m venv --system-site-packages work/feature-tour/venv
-work/feature-tour/venv/bin/pip install numpy pycairo
+work/feature-tour/venv/bin/pip install numpy Pillow
 work/feature-tour/venv/bin/python tools/media/build_tour.py \
   work/feature-tour/screens outputs/feature-tour
 ```
@@ -49,3 +50,12 @@ FFmpeg with libx264/AAC and DejaVu Sans must be installed. Outputs include an
 H.264/AAC MP4 with fast-start metadata, a stereo WAV master, a poster and sample
 frames for review. Large video/audio files stay out of Git; the README links to
 GitHub-hosted attachments. The generated soundtrack is deterministic.
+
+## Publish for inline playback
+
+Upload the MP4 as a GitHub Markdown attachment, for example with
+`gh pr comment <PR> --attach outputs/feature-tour/magicshelf-feature-tour.mp4`.
+Use the resulting `https://github.com/user-attachments/assets/...` URL alone on
+its own line in the README. GitHub renders that attachment as a video player.
+A release-download URL or a thumbnail linked to an MP4 triggers a download
+instead. Keep the H.264/AAC fast-start export under GitHub's attachment limit.
