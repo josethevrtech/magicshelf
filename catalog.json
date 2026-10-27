@@ -110,15 +110,15 @@
       ],
       "category": "Companions",
       "tagline": "A digital companion, now in your world.",
-      "about": "Smartphone Digivice brings Digital Partner into VR inside Jojogape’s Courage smartphone model. Pick it up, care for your pet, and place it anywhere in your space. The on-device settings control size, brightness and placement; name fields open the headset keyboard. Off stops the game and its audio. Saved pets and settings stay in the same private data directory across updates.",
+      "about": "Smartphone Digivice brings Digital Partner into VR inside Jojogape\u2019s Courage smartphone model. Pick it up, care for your pet, and place it anywhere in your space. The on-device settings control size, brightness and placement; name fields open the headset keyboard. Off stops the game and its audio. Saved pets and settings stay in the same private data directory across updates.",
       "screenshots": [
         {
           "url": "https://raw.githubusercontent.com/josethevrtech/magicshelf-smartphone-digivice/v0.2.8/media/smartphone-digivice.png",
-          "caption": "Digital Partner running inside Smartphone Digivice, using Jojogape’s Courage model."
+          "caption": "Digital Partner running inside Smartphone Digivice, using Jojogape\u2019s Courage model."
         },
         {
           "url": "https://raw.githubusercontent.com/josethevrtech/magicshelf-smartphone-digivice/v0.2.8/media/smartphone-digivice-back.png",
-          "caption": "Smartphone Digivice’s Courage case and crest, viewed from the back."
+          "caption": "Smartphone Digivice\u2019s Courage case and crest, viewed from the back."
         }
       ],
       "credits": [
@@ -212,7 +212,7 @@
       "screenshots": [
         {
           "url": "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/download/v0.3.13/pocket-pikachu.png",
-          "caption": "Pocket Pikachu’s live pixel display inside Wikiti’s yellow handheld model."
+          "caption": "Pocket Pikachu\u2019s live pixel display inside Wikiti\u2019s yellow handheld model."
         }
       ],
       "url": "https://github.com/josethevrtech/magicshelf-pocket-pikachu/releases/download/v0.3.13/org.magicshelf.pocket-pikachu-0.3.13-linux-aarch64.magicshelf",
