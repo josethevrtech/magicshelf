@@ -3,7 +3,7 @@
 The 48-second 1080p/30 fps tour presents MagicShelf 0.3.21. It uses the actual
 native UI renderer and public creation metadata captured on October 26, 2026.
 Six still screenshot scenes show Discover, creation details, permission review,
-the update policy, shelf customization and artist credits. Short fades are the
+the update policy, shelf customization and artist credits. Short opening and closing fades are the
 only visual effect. The closing credits scene lasts 18 seconds so its longer text
 can be read comfortably. The tour does not change the headset or install creations.
 

@@ -67,7 +67,7 @@ SCENES=[
  (12,18,'permissions-example','Choose what\nyou install.','Review permissions before subscribing.','INSTALL'),
  (18,24,'collection','Updates without\ninterruptions.','Keep playing. Updates install when Off.\nUpdate now asks before restarting.','STAY CURRENT'),
  (24,30,'shelf-settings','Make room\nfor your shelf.','Adjust size, spacing and placement.','CUSTOMIZE'),
- (30,48,'artist-credits','Made by people.\nBuilt for VR.','Credits and links inside every creation.','MAGICSHELF'),
+ (30,48,'artist-credits','Credits and links\ninside every creation.','MagicShelf and all creations will always\nbe free. Visit the Credits section to\ndiscover the artists behind the assets\nand the original projects each creation\nis based on, follow their work, and\nfind ways to support them.','MAGICSHELF'),
 ]
 
 def main():
@@ -100,14 +100,16 @@ def main():
         opacity=max(0,1-(t-start)/.18 if start else 0,1-(end-t)/.18)
         if opacity>0:c.set_source_rgba(.018,.022,.042,min(opacity,1));c.paint()
     output=a.output/'magicshelf-feature-tour.mp4'
-    cmd=['ffmpeg','-hide_banner','-loglevel','warning','-y','-f','rawvideo','-pixel_format','bgra','-video_size',f'{W}x{H}','-framerate',str(FPS),'-i','pipe:0','-i',str(a.output/'neon-shelf.wav'),'-c:v','libx264','-preset','fast','-crf','21','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart','-t',str(SECONDS),str(output)]
-    proc=subprocess.Popen(cmd,stdin=subprocess.PIPE)
-    for frame in range(FPS*SECONDS):
-        t=frame/FPS;index=next(i for i,s in enumerate(SCENES) if s[0]<=t<s[1]);scene(index,t);surface.flush();proc.stdin.write(surface.get_data())
-        if frame in (90,270,450,630,810,1170):surface.write_to_png(str(a.output/f'frame-{frame:04d}.png'))
-        if frame==90:surface.write_to_png(str(a.output/'poster.png'))
-    proc.stdin.close()
-    if proc.wait():raise RuntimeError('ffmpeg encoding failed')
+    slides=[]
+    for index,(start,end,*_) in enumerate(SCENES):
+        scene(index,(start+end)/2)
+        path=a.output/f'slide-{index+1}.png'
+        surface.write_to_png(str(path))
+        slides.append("file '"+path.resolve().as_posix()+"'\nduration "+str(end-start)+"\n")
+        if index==0:surface.write_to_png(str(a.output/'poster.png'))
+    slides.append("file '"+path.resolve().as_posix()+"'\n")
+    playlist=a.output/'slides.txt';playlist.write_text(''.join(slides))
+    subprocess.run(['ffmpeg','-hide_banner','-loglevel','warning','-y','-f','concat','-safe','0','-i',str(playlist),'-i',str(a.output/'neon-shelf.wav'),'-vf',f'fps={FPS},fade=t=in:st=0:d=0.18,fade=t=out:st={SECONDS-.3}:d=0.3','-c:v','libx264','-preset','fast','-crf','21','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart','-t',str(SECONDS),str(output)],check=True)
     print(output)
 
 if __name__=='__main__':main()
