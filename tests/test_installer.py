@@ -57,6 +57,16 @@ class InstallerTests(unittest.TestCase):
         (self.source / "bin/magicshelf").write_text("tampered")
         with self.assertRaises(RuntimeError):installer.install(self.source)
         self.assertFalse((self.home / ".config/systemd/user/magicshelf.service").exists())
+    def test_automatic_install_leaves_library_closed_without_stopping_creations(self):
+        installer.install(self.source,automatic=True)
+        self.assertIn(('stop','magicshelf-vr.service'),self.calls)
+        self.assertFalse(any(c[0]=='stop' and c[1]!='magicshelf-vr.service' for c in self.calls))
+
+    def test_explicit_update_and_reopen_keeps_library_available(self):
+        config=self.home/'.config/magicshelf';config.mkdir(parents=True)
+        (config/'framework-update.json').write_text(json.dumps({'reopen':True}))
+        installer.install(self.source,automatic=True)
+        self.assertNotIn(('stop','magicshelf-vr.service'),self.calls)
     def test_missing_session_is_rejected_before_staging_or_changing_files(self):
         with patch.object(installer, 'system', side_effect=RuntimeError('No user bus')):
             with self.assertRaisesRegex(RuntimeError, 'No user bus'): installer.install(self.source)

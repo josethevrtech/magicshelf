@@ -182,6 +182,17 @@ WantedBy=steamvr.service
                 if attempt == 99:
                     raise RuntimeError('MagicShelf could not open. Your previous version will be restored.')
                 time.sleep(.1)
+        # Automatic updates validate one frame, then release the library again.
+        # The separate shelf remains available; only explicit Update and reopen
+        # should leave the library process active. Older update workers also
+        # write this intent, so the first upgrade respects a closed library.
+        if automatic:
+            reopen = False
+            with contextlib.suppress(OSError, ValueError, TypeError):
+                intent = json.loads((config/'framework-update.json').read_text())
+                reopen = isinstance(intent, dict) and intent.get('reopen') is True
+            if not reopen:
+                system("stop", "magicshelf-vr.service")
         app = home / ".local/share/applications/com.josethevrtech.magicshelf.desktop"
         app.parent.mkdir(parents=True, exist_ok=True)
         icon = home / '.local/share/icons/hicolor/512x512/apps/com.josethevrtech.magicshelf.png'
