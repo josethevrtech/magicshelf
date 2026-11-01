@@ -79,7 +79,7 @@ int pages=(int(lines.size())+5)/6;assert(pages>1);
 for(int i=0;i<pages;i++){ui.aboutPage=i;check(ui,c,state);assert(ui.aboutPage==i);}
 ui.aboutPage=999;check(ui,c,state);assert(ui.aboutPage==pages-1);
 ui.local({0,0,0,0,"ui.about-prev","{}"},state,method,params);assert(ui.aboutPage==pages-2);
-ui.tab="settings";check(ui,c,state);for(auto b:ui.buttons)assert(b.method!="module.open");
+ui.tab="settings";check(ui,c,state);for(auto b:ui.buttons)if(b.method=="module.open")assert(boolfield(phone,"enabled"));
 ui.local({0,0,0,0,"ui.detail",argsFor("org.test.phone")},state,method,params);assert(ui.aboutPage==0);
 auto*notices=json_tokener_parse(R"([{"id":"org.test.download","name":"Test creation","version":"1.2.0","token":"1.2.0:abc","announced":false,"dismissed":false},{"id":"org.test.phone","name":"Phone","version":"2.0.0","token":"2:abc","announced":true,"dismissed":true},{"id":"org.test.third","name":"Third","version":"1.0.0","token":"1:abc"}])");
 json_object_object_add(state,"update_notices",notices);ui.selected.clear();ui.view="updates";ui.reviewId.clear();ui.noticePage=0;check(ui,c,state);
@@ -91,4 +91,7 @@ for(auto b:ui.buttons){
 assert(later&&updateNow);check(ui,c,state);assert(ui.local({0,0,0,0,"ui.confirm","{}"},state,method,params));assert(method=="module.subscribe");
 ui.reviewId.clear();auto oldKey=ui.key();ui.local({0,0,0,0,"ui.notices-next","{}"},state,method,params);assert(ui.key()!=oldKey);check(ui,c,state);assert(ui.noticePage==1);
 json_object_object_del(state,"update_notices");check(ui,c,state);assert(ui.noticePage==0);
+ui.selected.clear();ui.view="help";check(ui,c,state);bool quitReview=false;for(auto b:ui.buttons)if(b.method=="ui.quit")quitReview=true;assert(quitReview);
+ui.local({0,0,0,0,"ui.quit","{}"},state,method,params);check(ui,c,state);assert(ui.view=="quit");bool stop=false;for(auto b:ui.buttons)if(b.method=="ui.stop-close")stop=true;assert(stop);
+ui.selected="org.test.phone";ui.tab="settings";json_object_object_add(phone,"enabled",json_object_new_boolean(true));json_object_object_add(phone,"can_configure",json_object_new_boolean(true));check(ui,c,state);bool show=false;for(auto b:ui.buttons)if(b.method=="module.open")show=true;assert(show);
 json_object_put(state);std::cout<<"Storefront navigation, About pagination, update-notice controls/confirmation and non-overlapping hit targets passed\n";}

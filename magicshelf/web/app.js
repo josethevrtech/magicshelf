@@ -82,7 +82,7 @@ function detail(item){if(setupFocused(item))return setupPage(item);const section
   const state=el('div',null,'detail-status');state.append(el('span',item.adapter?'Installed locally':item.subscribed?'Installed · automatic updates':item.installed?'Installed':'Ready to download'));right.append(state);
   const actions=el('div',null,'detail-actions'),t=snapshot.transfer;
   if(t?.active&&t.id===item.id)actions.append(progress(t));
-  else if(item.installed)actions.append(power(item),button('Manage creation','secondary',()=>{tab='settings';render();}));
+  else if(item.installed){actions.append(power(item),button('Manage creation','secondary',()=>{tab='settings';render();}));if(item.enabled&&item.can_configure)actions.append(button('Show creation','secondary',()=>act('module.open',{id:item.id})));}
   else if(item.subscription_available)actions.append(button('Subscribe & download','primary',()=>review(item)));
   right.append(actions);
   right.append(el('p',item.adapter?'This creation is already installed on your device. Its downloadable release is still being prepared.':item.update_note?item.update_note:'Subscribe to download this creation and receive future updates.','explanation'));

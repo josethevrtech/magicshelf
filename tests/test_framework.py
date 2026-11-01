@@ -71,6 +71,22 @@ class FrameworkTests(unittest.TestCase):
         self.system.running.update([unit, "steamvr.service", *ADAPTERS[key]["backends"]])
         return unit
 
+    def test_show_running_creation_does_not_restart_it(self):
+        key='org.magicshelf.android-phone';self.adapter(key)
+        with patch('magicshelf.manager.subprocess.run'):
+            self.manager.open(key)
+        self.assertFalse(any(c[0] in ('stop','restart') for c in self.system.calls))
+        self.assertTrue(self.manager.state['modules'][key]['enabled'])
+
+    def test_explicit_stop_all_preserves_installs_and_subscriptions(self):
+        key='org.magicshelf.android-phone';self.adapter(key)
+        self.manager.state['subscriptions'][key]={'catalog_url':'https://example.com/catalog.json','permissions':[]}
+        with patch('magicshelf.manager.subprocess.run'):
+            dispatch(self.manager,{'api_version':1,'method':'creations.stop','params':{}})
+        self.assertFalse(self.manager.state['modules'][key]['enabled'])
+        self.assertIn(key,self.manager.state['subscriptions'])
+        self.assertTrue(self.system.active('steamvr.service'))
+
     def test_adapter_toggle_pauses_runtime_keeps_capture_and_redocks(self):
         key = "org.magicshelf.android-phone"
         unit = self.adapter(key)

@@ -21,6 +21,22 @@ class PreferencesTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def test_startup_is_opt_in_and_does_not_stop_running_services(self):
+        self.assertFalse(self.manager.snapshot()['preferences']['values']['start_with_steamvr'])
+        self.manager.update_settings({'start_with_steamvr': True})
+        self.assertIn(('enable','magicshelf-vr.service'),self.system.calls)
+        self.manager.update_settings({'start_with_steamvr': False})
+        self.assertIn(('disable','magicshelf-vr.service'),self.system.calls)
+        self.assertFalse(any(c[0] in ('stop','restart') or '--now' in c for c in self.system.calls))
+        restored=Manager(self.root/'home',self.root/'runtime',self.system)
+        self.assertFalse(restored.snapshot()['preferences']['values']['start_with_steamvr'])
+
+    def test_reset_app_disables_startup_without_touching_creations(self):
+        self.manager.update_settings({'start_with_steamvr':True})
+        self.manager.reset_settings('app')
+        self.assertEqual(self.system.calls[-1],('disable','magicshelf-vr.service'))
+        self.assertFalse(self.manager.snapshot()['preferences']['values']['start_with_steamvr'])
+
     def test_settings_persist_without_restarting_creations(self):
         old = load(self.manager.layoutpath)
         result = dispatch(self.manager, {'api_version': 1, 'method': 'settings.update', 'params': {'changes': {'slot_spacing_m': .16, 'dashboard_width_m': 2., 'start_view': 'library'}}})

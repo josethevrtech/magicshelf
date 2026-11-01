@@ -15,6 +15,7 @@ CONTROLS = [
     dict(key="lean_degrees", group="placement", label="Creation lean", description="Tilt creations back or forward while docked.", min=-25., max=25., step=1., unit="degrees"),
     dict(key="dashboard_width_m", group="app", label="Window size", description="Width of the MagicShelf app in VR.", min=1.2, max=2.4, step=.1, unit="m"),
     dict(key="start_view", group="app", label="Starting view", description="The page shown when MagicShelf starts.", choices=[dict(label="Discover", value="discover"), dict(label="My Shelf", value="library")]),
+    dict(key="start_with_steamvr", group="app", label="Start with SteamVR", description="Start quietly. Closing MagicShelf keeps creations running.", choices=[dict(label="Off", value=False), dict(label="On", value=True)]),
 ]
 BY_KEY = {control["key"]: control for control in CONTROLS}
 APP_KEYS = {c["key"] for c in CONTROLS if c["group"] == "app"}
@@ -27,7 +28,7 @@ CREDITS = [
 
 def defaults():
     shelf = load(Path(__file__).resolve().parent.parent / "shelf.json")
-    return {**{key: shelf[key] for key in BY_KEY if key not in APP_KEYS}, "dashboard_width_m": 1.8, "start_view": "discover"}
+    return {**{key: shelf[key] for key in BY_KEY if key not in APP_KEYS}, "dashboard_width_m": 1.8, "start_view": "discover", "start_with_steamvr": False}
 
 def validate(changes):
     require(isinstance(changes, dict) and changes, "Choose a setting to change")

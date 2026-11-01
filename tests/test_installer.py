@@ -43,10 +43,30 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue((self.home / ".local/share/magicshelf/current").is_symlink())
         self.assertFalse(any("steamvr.service" in call and call[0]=="restart" for call in self.calls))
         self.assertTrue(all("sudo" not in call for call in self.calls))
+    def test_installer_defaults_to_manual_start_and_preserves_opt_in(self):
+        installer.install(self.source)
+        self.assertIn(('disable','magicshelf-vr.service'),self.calls)
+        manifest=json.loads((self.home/'.config/magicshelf/magicshelf.vrmanifest').read_text())
+        self.assertNotIn('arguments',manifest['applications'][0])
+        layout=self.home/'.config/magicshelf/object-dock.json'
+        layout.write_text(json.dumps({'start_with_steamvr':True}))
+        self.calls.clear();installer.install(self.source)
+        self.assertIn(('enable','magicshelf-vr.service'),self.calls)
+
     def test_tampered_release_is_rejected_before_writing_integration(self):
         (self.source / "bin/magicshelf").write_text("tampered")
         with self.assertRaises(RuntimeError):installer.install(self.source)
         self.assertFalse((self.home / ".config/systemd/user/magicshelf.service").exists())
+    def test_automatic_install_leaves_library_closed_without_stopping_creations(self):
+        installer.install(self.source,automatic=True)
+        self.assertIn(('stop','magicshelf-vr.service'),self.calls)
+        self.assertFalse(any(c[0]=='stop' and c[1]!='magicshelf-vr.service' for c in self.calls))
+
+    def test_explicit_update_and_reopen_keeps_library_available(self):
+        config=self.home/'.config/magicshelf';config.mkdir(parents=True)
+        (config/'framework-update.json').write_text(json.dumps({'reopen':True}))
+        installer.install(self.source,automatic=True)
+        self.assertNotIn(('stop','magicshelf-vr.service'),self.calls)
     def test_missing_session_is_rejected_before_staging_or_changing_files(self):
         with patch.object(installer, 'system', side_effect=RuntimeError('No user bus')):
             with self.assertRaisesRegex(RuntimeError, 'No user bus'): installer.install(self.source)
@@ -55,7 +75,7 @@ class InstallerTests(unittest.TestCase):
         with patch.object(installer.subprocess,"run",side_effect=RuntimeError("bootstrap failed")), self.assertRaises(RuntimeError):
             installer.install(self.source)
         self.assertFalse((self.home / ".local/share/magicshelf/current").exists())
-        self.assertIn(("disable","--now","magicshelf-vr.service","magicshelf.service"),self.calls)
+        self.assertIn(("disable","--now","magicshelf-vr.service","magicshelf.service","magicshelf-shelf.service"),self.calls)
         self.assertFalse((self.home / ".config/systemd/user/magicshelf.service").exists())
     def test_new_dashboard_must_render_before_update_is_accepted(self):
         root = self.home / '.local/share/magicshelf';root.mkdir(parents=True)

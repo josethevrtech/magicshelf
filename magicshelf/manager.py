@@ -614,6 +614,8 @@ class Manager(Updates):
         changes = preferences.validate(changes)
         with self.transaction():
             data = load(self.layoutpath)
+            if "start_with_steamvr" in changes:
+                self.system.call("enable" if changes["start_with_steamvr"] else "disable", "magicshelf-vr.service")
             reposition = any(key in preferences.PLACEMENT_KEYS and data.get(key) != value for key, value in changes.items())
             data.update(changes)
             atomic(self.layoutpath, data)
@@ -627,11 +629,21 @@ class Manager(Updates):
         defaults = preferences.defaults()
         with self.transaction():
             data = load(self.layoutpath)
+            if group == "app":
+                self.system.call("disable", "magicshelf-vr.service")
             data.update({c["key"]: defaults[c["key"]] for c in preferences.CONTROLS if c["group"] == group})
             atomic(self.layoutpath, data)
             if group != "app":
                 self.home_all()
             self.message = "Default settings restored." + (" Creations returned to the dock." if group != "app" else "")
+        return self.snapshot()
+
+    def stop_creations(self):
+        """Explicitly stop creations; ordinary library close never calls this."""
+        for key in list(self.state['modules']):
+            if self.state['modules'][key]['enabled']:
+                self.toggle(key, False)
+        self.message = "All creations are Off."
         return self.snapshot()
 
     def setup_step(self, key, appid=None):
