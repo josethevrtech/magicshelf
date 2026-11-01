@@ -22,6 +22,15 @@ select **MagicShelf** in SteamVR's dashboard.
 Keep **Install MagicShelf** on your desktop. The same icon installs the latest
 version whenever you need it. No terminal or administrator password is needed.
 
+MagicShelf starts manually by default. **Settings > App > Start with SteamVR**
+opts into quiet startup. The Close button and SteamVR's close control exit the
+library; creations already On keep running. Reopen from the shortcut or dashboard.
+**Help & exit > Stop all and close** also turns creations Off after confirmation.
+
+If a creation is hidden, open its page, choose **Manage > Show creation** to bring
+it back without restarting it. Off stops the creation. Its own placement and
+controller settings remain inside the creation.
+
 Install once. MagicShelf downloads updates automatically and applies them when its
 panel is closed. Subscribed creations update while Off, keeping their saved data.
 

@@ -38,6 +38,7 @@ def dispatch(manager, packet):
         "module.setup": lambda: manager.setup_step(p["id"], p.get("appid")),
         "module.setup.open": lambda: manager.setup_open(p["id"], p["appid"]),
         "module.open": lambda: manager.open(p["id"]),
+        "creations.stop": manager.stop_creations,
         "module.toggle": lambda: manager.toggle(p["id"], p["enabled"]),
         "module.subscribe": lambda: manager.subscribe(p["id"], False) if p.get("subscribed") is False else manager.request_install(method, p),
         "module.link": lambda: manager.open_link(p["id"], p["index"]),

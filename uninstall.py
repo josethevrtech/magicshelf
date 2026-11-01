@@ -12,7 +12,7 @@ import subprocess
 import sys
 from magicshelf.session import service_environment, user_runtime
 
-OWNED_UNIT = re.compile(r'magicshelf(?:-vr|-update|-module-[A-Za-z0-9_.-]+)?\.service')
+OWNED_UNIT = re.compile(r'magicshelf(?:-vr|-shelf|-update|-module-[A-Za-z0-9_.-]+)?\.service')
 
 
 def remove_path(path):
@@ -152,7 +152,7 @@ def uninstall(progress=lambda label: None, *, purge=False):
         stop('magicshelf-vr.service')
         # A failed older uninstall may delete unit files while processes remain.
         listed = system('list-units', '--all', '--plain', '--no-legend', 'magicshelf*.service')
-        names = {'magicshelf.service', 'magicshelf-vr.service', 'magicshelf-update.service'}
+        names = {'magicshelf.service', 'magicshelf-vr.service', 'magicshelf-update.service', 'magicshelf-shelf.service'}
         names.update(line.split()[0] for line in listed.stdout.splitlines() if line.split() and OWNED_UNIT.fullmatch(line.split()[0]))
         names.update(p.name for p in units.glob('magicshelf*.service') if OWNED_UNIT.fullmatch(p.name))
         for path in units.glob('*.wants/magicshelf*.service'):

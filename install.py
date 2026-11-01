@@ -76,9 +76,10 @@ def _install(source, resources, automatic=False):
     units.mkdir(parents=True, exist_ok=True)
     backup = root / "install-backups" / str(time.time_ns())
     backup.mkdir(parents=True)
-    for name in ("magicshelf.service", "magicshelf-vr.service"):
+    for name in ("magicshelf.service", "magicshelf-vr.service", "magicshelf-shelf.service"):
         if (units / name).exists():
             shutil.copy2(units / name, backup / name)
+    vr_was_enabled = system("is-enabled", "--quiet", "magicshelf-vr.service", check=False).returncode == 0
     try:
         marker.unlink(missing_ok=True)
         nextlink = root / "current.next"
@@ -121,12 +122,33 @@ UMask=0077
 [Install]
 WantedBy=steamvr.service
 """)
+        (units / "magicshelf-shelf.service").write_text("""[Unit]
+Description=MagicShelf shelf rail (no library window)
+BindsTo=steamvr.service
+After=steamvr.service magicshelf.service
+PartOf=steamvr.service
+
+[Service]
+ExecStart=%h/.local/share/magicshelf/current/bin/magicshelf-shelf
+Environment=MAGICSHELF_LAYOUT_DIR=%h/.config/magicshelf
+Restart=on-failure
+RestartSec=5
+MemoryMax=128M
+NoNewPrivileges=yes
+UMask=0077
+
+[Install]
+WantedBy=steamvr.service
+""")
         system("daemon-reload")
         config = home / ".config/magicshelf"
         config.mkdir(parents=True, exist_ok=True)
         manifest = {"source": "user", "applications": [{"app_key": "com.josethevrtech.magicshelf", "launch_type": "binary", "binary_path_linux": str(current / "bin/magicshelf-vr-launch"), "binary_path_linux_arm": str(current / "bin/magicshelf-vr-launch"), "is_dashboard_overlay": True, "strings": {"en_us": {"name": "MagicShelf", "description": "A home for my VR creations."}}}]}
         (config / "magicshelf.vrmanifest").write_text(json.dumps(manifest, indent=2) + "\n")
-        system("enable", "magicshelf.service", "magicshelf-vr.service")
+        system("enable", "magicshelf.service", "magicshelf-shelf.service")
+        layout_path = config / "object-dock.json"
+        startup = json.loads(layout_path.read_text()).get('start_with_steamvr', False) if layout_path.exists() else False
+        system("enable" if startup is True else "disable", "magicshelf-vr.service")
         system("restart", "magicshelf.service")
         runtime = user_runtime() / "magicshelf"
         sys.path.insert(0, str(current))
@@ -148,7 +170,7 @@ WantedBy=steamvr.service
         # The first-party example package is included in the verified framework bundle.
         subprocess.run([str(current / "bin/magicshelf-bootstrap")], check=True, timeout=30)
         if system("is-active", "--quiet", "steamvr.service", check=False).returncode == 0:
-            system("restart", "magicshelf-vr.service")
+            system("restart", "magicshelf-shelf.service", "magicshelf-vr.service")
             for attempt in range(100):
                 try:
                     pid = int(system('show', 'magicshelf-vr.service', '-p', 'MainPID', '--value').stdout.strip())
@@ -188,6 +210,8 @@ WantedBy=steamvr.service
             shortcut.chmod(0o755)
         print("MagicShelf installed. Open MagicShelf on your desktop or in SteamVR's dashboard.")
     except Exception:
+        if not (backup/"magicshelf-shelf.service").exists():
+            system("disable", "--now", "magicshelf-shelf.service", check=False)
         if was_uninstalled:
             marker.touch()
         if previous:
@@ -196,16 +220,18 @@ WantedBy=steamvr.service
             nextlink.symlink_to(previous)
             os.replace(nextlink, current)
         else:
-            system("disable", "--now", "magicshelf-vr.service", "magicshelf.service", check=False)
+            system("disable", "--now", "magicshelf-vr.service", "magicshelf.service", "magicshelf-shelf.service", check=False)
             current.unlink(missing_ok=True)
-        for name in ("magicshelf.service", "magicshelf-vr.service"):
+        for name in ("magicshelf.service", "magicshelf-vr.service", "magicshelf-shelf.service"):
             if (backup / name).exists():
                 shutil.copy2(backup / name, units / name)
             else:
                 (units / name).unlink(missing_ok=True)
         system("daemon-reload", check=False)
         if previous:
+            system("enable" if vr_was_enabled else "disable", "magicshelf-vr.service", check=False)
             system("restart", "magicshelf.service", "magicshelf-vr.service", check=False)
+            if (backup/"magicshelf-shelf.service").exists():system("restart", "magicshelf-shelf.service", check=False)
         raise
 
 if __name__ == "__main__":

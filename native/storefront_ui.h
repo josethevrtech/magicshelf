@@ -77,6 +77,7 @@ struct StoreUI{
   button(c,20,141,180,"Discover","ui.discover","{}",view=="discover");
   button(c,20,199,180,"My Shelf","ui.library","{}",view=="library");
   button(c,20,257,180,"Settings","ui.preferences","{}",view=="settings");
+  button(c,20,315,180,"Help & exit","ui.help","{}",view=="help");
   if(auto*n=field(state,"update_notices");n&&json_object_array_length(n))button(c,20,375,182,"Updates ready","ui.updates","{}",view=="updates");
   if(textfield(field(state,"framework_update"),"stage")=="ready")button(c,20,475,182,"App update ready","ui.appupdates");
   if(auto*t=field(state,"transfer");t&&textfield(t,"stage")!="complete"&&!setupFocused(find(state,selected))){
@@ -94,9 +95,9 @@ struct StoreUI{
   auto*m=find(state,selected);if(!selected.empty()&&!m)selected.clear();
   bool setup=setupFocused(m)&&reviewId.empty();
   if(m&&!setup)text(c,254,55,"Collection / "+textfield(m,"name"),17,true,670);
-  button(c,1094,25,154,"Close panel","ui.close","{}",false,44);
+  button(c,1094,25,154,"Close","ui.close","{}",false,44);
   ShelfTheme::rect(c,254,94,994,1,ShelfTheme::border);
-  if(!reviewId.empty())review(c,state);else if(m)detail(c,m,state);else if(view=="settings")preferences(c,state);else if(view=="updates")updateNotices(c,state);else collection(c,state);
+  if(!reviewId.empty())review(c,state);else if(m)detail(c,m,state);else if(view=="settings")preferences(c,state);else if(view=="updates")updateNotices(c,state);else if(view=="help"||view=="quit")help(c);else collection(c,state);
   auto*t=field(state,"transfer");std::string status=boolfield(t,"active")?transferLabel(t)+" · "+textfield(t,"name"):busy?"Updating your shelf... You can keep browsing.":message;
   if(!setup||actionFailed){ShelfTheme::rect(c,254,848,994,1,ShelfTheme::border);text(c,254,869,actionFailed?message:status,14,true,994);if(!setup)text(c,254,891,textfield(state,"update_message"),12,true,994);}
  }
@@ -166,17 +167,30 @@ struct StoreUI{
    ShelfTheme::rect(c,278,y+78,970,1,ShelfTheme::border);
   }
   if(settingsTab=="app"){
-   text(c,278,518,"Updates",24);wrap(c,278,553,650,"Creations stay up to date automatically. Downloaded updates install while Off.",18,3);
-   button(c,1010,522,238,"Check updates","subscriptions.sync");
+   text(c,278,580,"Updates",24);wrap(c,278,615,650,"Creations stay up to date automatically. Downloaded updates install while Off.",18,3);
+   button(c,1010,584,238,"Check updates","subscriptions.sync");
    auto*app=field(state,"framework_update");auto stage=textfield(app,"stage");
    text(c,278,661,"MagicShelf "+textfield(state,"version"),24);
-   wrap(c,278,703,650,textfield(app,"message"),18,3);
+   wrap(c,278,703,650,textfield(app,"message"),18,2);
    if(stage=="downloading"){progressBar(c,app,278,754,650);}
    else if(stage=="ready")button(c,970,687,278,"Update and reopen","framework.install","{}",true);
    else if(stage=="failed")button(c,1010,687,238,"Try again","catalog.refresh");
   }
   button(c,254,782,238,"Restore defaults","settings.reset",std::string("{\"group\":\"")+settingsTab+"\"}");
   text(c,518,812,settingsTab=="app"?"Changes save automatically.":"Layout changes return creations to the dock.",17,true,730);
+ }
+ void help(Canvas&c){
+  text(c,254,171,view=="quit"?"Stop all creations and close?":"Using MagicShelf",38);
+  if(view=="quit"){
+   wrap(c,278,300,925,"This turns every creation Off and closes the library. Saved data and subscriptions are kept. Ordinary Close leaves your creations running.",23,4);
+   button(c,278,520,300,"Cancel","ui.help");button(c,608,520,500,"Stop all and close","ui.stop-close");return;
+  }
+  text(c,278,294,"Open, close and startup",25);
+  wrap(c,278,337,925,"Open MagicShelf from its desktop shortcut or SteamVR dashboard. Close exits the library; your creations keep running. Start with SteamVR is optional under Settings > App and starts quietly.",21,4);
+  text(c,278,462,"Find a hidden creation",25);
+  wrap(c,278,505,925,"Open its page, choose Manage, then Show creation. This brings an On creation back without restarting it. Off stops the creation. Device controls and placement settings live inside each creation.",21,4);
+  wrap(c,278,645,925,"Grip to pick up supported creations. Open a creation's About page for its controller buttons, gestures and settings. Updates install while Off; Update now asks before restarting.",20,3);
+  button(c,278,752,380,"Stop all and close...","ui.quit");
  }
  void updateNotices(Canvas&c,json_object*state){
   text(c,254,171,"Updates ready",38);
@@ -229,6 +243,7 @@ struct StoreUI{
   }
   else if(tab=="settings"){
    if(!boolfield(m,"installed")){wrap(c,738,625,508,"Subscribe and download this creation to manage it.",20,3);return;}
+   if(boolfield(m,"can_configure")&&boolfield(m,"enabled"))button(c,738,671,510,"Show creation","module.open",argsFor(id),false,42);
    text(c,738,621,"Version "+textfield(m,"version"),21);text(c,738,650,boolfield(m,"enabled")?"On. Use the creation's own controls to change its settings.":"Ready to use. Turn it On above to begin.",16,true,508);
    if(!boolfield(m,"adapter")){
     if(field(m,"update"))button(c,738,728,245,textfield(m,"update_status")=="ready"?"Update now":"Review update","ui.update",argsFor(id),false,44);
@@ -266,7 +281,7 @@ struct StoreUI{
  }
  // Navigation stays local. Only concrete user actions produce manager requests.
  bool local(const StoreButton&b,json_object*state,std::string&method,std::string&params){auto*arg=json_tokener_parse(b.params.c_str());std::string id=textfield(arg,"id");if(arg)json_object_put(arg);
-  if(b.method=="ui.discover"||b.method=="ui.library"||b.method=="ui.preferences"){view=b.method=="ui.discover"?"discover":b.method=="ui.library"?"library":"settings";selected.clear();reviewId.clear();page=0;}
+  if(b.method=="ui.discover"||b.method=="ui.library"||b.method=="ui.preferences"||b.method=="ui.help"||b.method=="ui.quit"){view=b.method=="ui.discover"?"discover":b.method=="ui.library"?"library":b.method=="ui.help"?"help":b.method=="ui.quit"?"quit":"settings";selected.clear();reviewId.clear();page=0;}
   else if(b.method.rfind("ui.pref.",0)==0)settingsTab=b.method.substr(8);
   else if(b.method=="ui.detail"){selected=id;auto*m=find(state,id);tab=boolfield(m,"installed")&&field(m,"setup")&&!boolfield(field(m,"setup"),"ready")?"settings":"about";gallery=0;creditPage=0;linkPage=0;aboutPage=0;}
   else if(b.method=="ui.about-next")aboutPage++;else if(b.method=="ui.about-prev")aboutPage--;

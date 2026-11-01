@@ -6,5 +6,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from magicshelf.session import service_environment
 env = service_environment()
-subprocess.run(["systemctl", "--user", "start", "steamvr.service", "magicshelf.service", "magicshelf-vr.service"], env=env, check=True)
-subprocess.run([str(Path(__file__).resolve().parent / "magicshelf-vr"), "--show"], env=env, check=True)
+subprocess.run(["systemctl", "--user", "start", "steamvr.service", "magicshelf.service", "magicshelf-shelf.service", "magicshelf-vr.service"], env=env, check=True)
+if '--background' not in sys.argv:
+    subprocess.run([str(Path(__file__).resolve().parent / "magicshelf-vr"), "--show"], env=env, check=True)

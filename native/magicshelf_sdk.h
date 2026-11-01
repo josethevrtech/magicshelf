@@ -6,16 +6,28 @@
 #include <sys/un.h>
 #include <cstring>
 #include <ctime>
+#include <atomic>
+#include <poll.h>
 
 inline std::string magicshelfEnv(const char*key){auto*p=getenv(key);if(!p||!*p)throw std::runtime_error(std::string("Missing MagicShelf environment: ")+key);return p;}
-inline std::string magicshelfRpc(const std::string&request,int seconds=235){
+inline std::string magicshelfRpc(const std::string&request,int seconds=235,const std::atomic<bool>*keepRunning=nullptr){
  int fd=socket(AF_UNIX,SOCK_STREAM|SOCK_CLOEXEC,0);if(fd<0)throw std::runtime_error("MagicShelf socket failed");
  timeval timeout{seconds,0};setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof(timeout));setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&timeout,sizeof(timeout));
  sockaddr_un address{};address.sun_family=AF_UNIX;std::string path=magicshelfEnv("MAGICSHELF_RUNTIME_DIR")+"/manager.sock";
  if(path.size()>=sizeof(address.sun_path)){close(fd);throw std::runtime_error("MagicShelf socket path is too long");}strcpy(address.sun_path,path.c_str());
  if(connect(fd,(sockaddr*)&address,sizeof(address))){close(fd);throw std::runtime_error("MagicShelf is unavailable");}
  std::string data=request+"\n";size_t sent=0;while(sent<data.size()){auto n=send(fd,data.data()+sent,data.size()-sent,MSG_NOSIGNAL);if(n<=0){close(fd);throw std::runtime_error("MagicShelf send failed");}sent+=n;}
- data.clear();char buffer[4096];while(data.size()<1024*1024){auto n=read(fd,buffer,sizeof(buffer));if(n<=0)break;data.append(buffer,n);if(data.back()=='\n')break;}close(fd);return data;
+ data.clear();char buffer[4096];auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(seconds);
+ while(data.size()<1024*1024){
+  if(keepRunning){
+   if(!keepRunning->load()){close(fd);throw std::runtime_error("Library closed; the manager continues the operation");}
+   if(std::chrono::steady_clock::now()>=deadline){close(fd);throw std::runtime_error("MagicShelf request timed out");}
+   pollfd ready{fd,POLLIN,0};int result=poll(&ready,1,200);
+   if(result==0)continue;if(result<0){if(errno==EINTR)continue;close(fd);throw std::runtime_error("MagicShelf receive failed");}
+  }
+  auto n=read(fd,buffer,sizeof(buffer));if(n<=0)break;data.append(buffer,n);if(data.back()=='\n')break;
+ }
+ close(fd);return data;
 }
 inline void magicshelfReady(){
  auto*j=json_object_new_object();json_object_object_add(j,"api_version",json_object_new_int(std::stoi(magicshelfEnv("MAGICSHELF_API_VERSION"))));json_object_object_add(j,"method",json_object_new_string("runtime.ready"));auto*p=json_object_new_object();json_object_object_add(p,"id",json_object_new_string(magicshelfEnv("MAGICSHELF_MODULE_ID").c_str()));json_object_object_add(p,"token",json_object_new_string(magicshelfEnv("MAGICSHELF_SESSION").c_str()));json_object_object_add(j,"params",p);

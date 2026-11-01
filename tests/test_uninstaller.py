@@ -21,9 +21,9 @@ class UninstallerTests(unittest.TestCase):
         self.desktop = self.home/'Desktop'; self.desktop.mkdir()
         self.runtime = self.home/'runtime'; self.runtime.mkdir()
         self.orphan = 'magicshelf-module-org.magicshelf.orphan.service'
-        self.running = {'magicshelf.service', 'magicshelf-vr.service', self.orphan}
+        self.running = {'magicshelf.service', 'magicshelf-vr.service', 'magicshelf-shelf.service', self.orphan}
         self.calls = []; self.refuse = None
-        for name in ('magicshelf.service', 'magicshelf-vr.service'):
+        for name in ('magicshelf.service', 'magicshelf-vr.service', 'magicshelf-shelf.service'):
             (self.units/name).write_text('unit')
             target = self.units/'default.target.wants'; target.mkdir(exist_ok=True)
             (target/name).symlink_to(self.units/name)

@@ -27,7 +27,7 @@ class ReleaseTests(unittest.TestCase):
             shutil.copytree(PROJECT / directory, self.root / directory, ignore=shutil.ignore_patterns("__pycache__"))
         for name in ("catalog.json","collections.json","shelf.json","install.py","uninstall.py","LICENSE","OPENVR-LICENSE.txt"):
             shutil.copy2(PROJECT / name,self.root / name)
-        for name in ("build/bin/magicshelf-vr","build/icon.png"):
+        for name in ("build/bin/magicshelf-vr","build/bin/magicshelf-shelf","build/icon.png"):
             path=self.root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b"Packaging fixture only; not a binary release");path.chmod(0o755)
         with patch.object(builder,"ROOT",self.root),contextlib.redirect_stdout(io.StringIO()):builder.build("aarch64")
     def tearDown(self):self.temp.cleanup()

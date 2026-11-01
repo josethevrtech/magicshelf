@@ -28,7 +28,12 @@ void dashboard(){
  auto config=magicshelfEnv("MAGICSHELF_LAYOUT_DIR"),dir=magicshelfEnv("MAGICSHELF_RUNTIME_DIR");
  auto*applications=vr::VRApplications();
  if(applications->AddApplicationManifest((config+"/magicshelf.vrmanifest").c_str(),false))throw std::runtime_error("Cannot register MagicShelf with SteamVR");
- applications->SetApplicationAutoLaunch("com.josethevrtech.magicshelf",true);applications->IdentifyApplication(getpid(),"com.josethevrtech.magicshelf");
+ // One-time migration of the old forced SteamVR auto-launch flag.
+ auto migration=std::filesystem::path(config)/"startup-policy-v1";
+ if(!std::filesystem::exists(migration)){
+  if(applications->SetApplicationAutoLaunch("com.josethevrtech.magicshelf",false)==vr::VRApplicationError_None){std::ofstream marker(migration);marker<<"Startup is controlled in Settings > App.\n";}
+ }
+ applications->IdentifyApplication(getpid(),"com.josethevrtech.magicshelf");
  auto*o=vr::VROverlay();
  DashboardTexture gpu(StoreUI::W*RenderScale,StoreUI::H*RenderScale);
  OverlayLifetime overlay{o};vr::VROverlayHandle_t thumb=0;
@@ -41,10 +46,10 @@ void dashboard(){
  o->SetOverlayInputMethod(panel,vr::VROverlayInputMethod_Mouse);vr::HmdVector2_t mouse{{StoreUI::W,StoreUI::H}};
  o->SetOverlayMouseScale(panel,&mouse);o->SetOverlayWidthInMeters(panel,DashboardWidthMeters);
  vr::VRTextureBounds_t bounds{0,0,1,1};o->SetOverlayTextureBounds(panel,&bounds);
- ObjectDock shelf(o,config);Canvas canvas(StoreUI::W*RenderScale,StoreUI::H*RenderScale);cairo_scale(canvas.c,RenderScale,RenderScale);
+ Canvas canvas(StoreUI::W*RenderScale,StoreUI::H*RenderScale);cairo_scale(canvas.c,RenderScale,RenderScale);
  // The GPU uploader converts only dirty regions. Canvas's full RGBA copy is unused.
  canvas.rgba.clear();canvas.rgba.shrink_to_fit();
- StoreUI ui;StoreInput input;bool initialView=false;float appliedWidth=DashboardWidthMeters;
+ StoreUI ui;StoreInput input;bool initialView=false,quitAfterAction=false;float appliedWidth=DashboardWidthMeters;
  std::string data,previous,previousHover,previousPressed,actionError;
  std::mutex stateMutex;ActionWorker worker;
  auto action=[&](const std::string&method,const std::string&params){
@@ -52,19 +57,18 @@ void dashboard(){
   {std::lock_guard<std::mutex>lock(stateMutex);actionError.clear();}
   if(worker.thread.joinable())worker.thread.join();
   worker.thread=std::thread([&,method,params](){
-   try{auto result=magicshelfRpc("{\"api_version\":1,\"method\":\""+method+"\",\"params\":"+params+"}");auto*j=json_tokener_parse(result.c_str());if(!j)throw std::runtime_error("MagicShelf returned an invalid response");auto message=textfield(j,"error");json_object_put(j);if(!message.empty())throw std::runtime_error(message);}
+   try{auto result=magicshelfRpc("{\"api_version\":1,\"method\":\""+method+"\",\"params\":"+params+"}",235,&running);auto*j=json_tokener_parse(result.c_str());if(!j)throw std::runtime_error("MagicShelf returned an invalid response");auto message=textfield(j,"error");json_object_put(j);if(!message.empty())throw std::runtime_error(message);}
    catch(std::exception&e){std::lock_guard<std::mutex>lock(stateMutex);actionError=e.what();}
    busy=false;
   });
  };
  using State=std::unique_ptr<json_object,decltype(&json_object_put)>;
  State state(json_tokener_parse("{\"modules\":[],\"message\":\"Connecting to MagicShelf...\"}"),json_object_put);
- using Clock=std::chrono::steady_clock;auto poll=Clock::now(),dockTick=poll,activityTick=poll;
+ using Clock=std::chrono::steady_clock;auto poll=Clock::now(),activityTick=poll;
  auto nextNotice=poll;std::set<std::string> delivered;std::set<vr::VRNotificationId> noticeIds;
  uint64_t frames=0,fullFrames=0,partialFrames=0;double peakMs=0;
  while(running){
   auto now=Clock::now();
-  if(now>=dockTick){vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount];vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseStanding,.01f,poses,vr::k_unMaxTrackedDeviceCount);shelf.refresh();shelf.show(poses[0].bPoseIsValid);dockTick=now+std::chrono::milliseconds(50);}
   if(now>=poll){std::ifstream f(dir+"/ui-state.json");std::string next((std::istreambuf_iterator<char>(f)),{});if(next!=data){auto*j=json_tokener_parse(next.c_str());if(j){state.reset(j);data=next;}}poll=now+std::chrono::milliseconds(100);}
   auto*j=state.get();auto*prefs=field(field(j,"preferences"),"values");
   if(prefs){
@@ -102,7 +106,7 @@ void dashboard(){
   while(o->PollNextOverlayEvent(panel,&event,sizeof(event))){
    if(event.eventType==vr::VREvent_Notification_BeginInteraction&&noticeIds.count(event.data.notification.notificationId)){ui.view="updates";ui.selected.clear();ui.reviewId.clear();input.cancel();o->ShowDashboard("com.josethevrtech.magicshelf");continue;}
    if(event.eventType==vr::VREvent_Notification_Destroyed){noticeIds.erase(event.data.notification.notificationId);continue;}
-   if(event.eventType==vr::VREvent_OverlayClosed){o->HideOverlay(panel);input.cancel();continue;}
+   if(event.eventType==vr::VREvent_OverlayClosed){running=false;input.cancel();continue;}
    if(event.eventType==vr::VREvent_ScrollDiscrete&&!ui.selected.empty()&&ui.tab=="about"&&event.data.scroll.ydelta!=0){ui.aboutPage+=event.data.scroll.ydelta<0?1:-1;input.cancel();continue;}
    if(event.eventType==vr::VREvent_OverlayShown){action("catalog.discover","{}");continue;}
    if(event.eventType==vr::VREvent_Quit){running=false;continue;}
@@ -113,7 +117,8 @@ void dashboard(){
    float x=event.data.mouse.x,y=StoreUI::H-event.data.mouse.y;
    if(event.eventType==vr::VREvent_MouseButtonDown)input.down(ui,x,y,working);
    else if(auto hit=input.up(ui,x,y,working)){
-    if(hit->method=="ui.close"){o->HideOverlay(panel);input.cancel();continue;}
+    if(hit->method=="ui.close"){running=false;input.cancel();continue;}
+    if(hit->method=="ui.stop-close"){if(working)continue;action("creations.stop","{}");quitAfterAction=true;input.cancel();continue;}
     std::string method,params;auto before=ui.key();if(ui.local(*hit,j,method,params))action(method,params);
     else if(hit->method=="ui.discover")action("catalog.discover","{}");
     if(ui.key()!=before)input.cancel();
@@ -122,6 +127,8 @@ void dashboard(){
    }
   }
   std::string failure;{std::lock_guard<std::mutex>lock(stateMutex);failure=actionError;}
+  if(quitAfterAction&&!busy){if(failure.empty()){running=false;break;}quitAfterAction=false;}
+  if(!running)break;
   auto key=data+ui.key()+std::to_string(working)+failure;
   bool full=key!=previous,feedback=input.hover!=previousHover||input.pressed!=previousPressed;
   bool capture=std::filesystem::exists(dir+"/capture-dashboard.request");
@@ -143,7 +150,6 @@ void dashboard(){
   }
   std::this_thread::sleep_for(std::chrono::milliseconds(o->IsOverlayVisible(panel)?8:50));
  }
- shelf.destroy();
  // worker joins, then the overlay releases its texture, then EGL is destroyed.
 }
 

@@ -3,7 +3,7 @@
 import argparse, base64, gzip, hashlib, json, os, shutil, stat, tarfile, tempfile, zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent.parent
-VERSION='0.3.21'
+VERSION='0.3.25'
 REPO='josethevrtech/magicshelf'
 
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -26,6 +26,7 @@ def build(arch):
             target=payload/name;target.parent.mkdir(parents=True,exist_ok=True)
             copy_public(source,target)
         copy_public(ROOT/'build/bin/magicshelf-vr',payload/'bin/magicshelf-vr')
+        copy_public(ROOT/'build/bin/magicshelf-shelf',payload/'bin/magicshelf-shelf')
         for name in ['collections.json','shelf.json','install.py','uninstall.py','LICENSE','OPENVR-LICENSE.txt','build/icon.png']:
             copy_public(ROOT/name,payload/Path(name).name)
         (payload/'bundled').mkdir()
